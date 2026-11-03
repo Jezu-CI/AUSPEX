@@ -1,0 +1,73 @@
+#!/bin/bash
+# Pare-feu du capteur (nftables), généré depuis capteur.conf.
+#   - interface d'écoute : AUCUNE trame ne sort (crochet egress, avant même
+#     ARP) ; le capteur est invisible sur le réseau surveillé ;
+#   - interface d'administration : sorties vers le central (port d'envoi),
+#     les DNS et NTP déclarés, DHCP ; aucune entrée hors réponses ;
+#   - rien d'autre, ni en entrée, ni en sortie, ni en routage.
+# Sans configuration : tout reste fermé (/etc/nftables.conf, chargé au démarrage).
+set -euo pipefail
+. /usr/local/lib/auspex/lib.sh
+trap 'msg "ERREUR $(basename "$0") ligne $LINENO : $BASH_COMMAND"' ERR
+[ -f "$RUN/capteur.env" ] || { msg "pare-feu : pas de configuration, tout reste fermé"; exit 0; }
+load_conf "$CONF"
+ADMIN=$(sed -n 's/^ADMIN=//p' "$RUN/capteur.env"); ECOUTE=$(sed -n 's/^ECOUTE=//p' "$RUN/capteur.env")
+
+ips() {  # adresses IPv4 d'une liste de noms ou d'adresses (résolues au démarrage)
+    local h
+    for h in ${1//,/ }; do
+        if [[ "$h" =~ ^[0-9.]+$ ]]; then echo "$h"; else getent ahostsv4 "$h" | awk '{print $1}' | sort -u; fi
+    done | sort -u | paste -sd, -
+}
+dns=$(ips "${C[DNS]:-}")
+if [ -n "$dns" ]; then
+    printf 'nameserver %s\n' ${dns//,/ } > /etc/resolv.conf
+fi
+
+# ruleset CENTRAL NTP : génère et charge le jeu de règles complet (remplacement atomique)
+ruleset() {
+    local central="$1" ntp="$2"
+    {
+        echo "flush ruleset"
+        echo "table inet auspex {"
+        echo "  chain input {"
+        echo "    type filter hook input priority 0; policy drop;"
+        echo "    iif lo accept"
+        echo "    ct state established,related accept"
+        echo "    iifname \"$ADMIN\" udp sport 67 udp dport 68 accept"
+        echo "  }"
+        echo "  chain output {"
+        echo "    type filter hook output priority 0; policy drop;"
+        echo "    oif lo accept"
+        echo "    ct state established,related accept"
+        echo "    oifname \"$ADMIN\" udp sport 68 udp dport 67 accept"
+        [ -n "$dns" ] && echo "    oifname \"$ADMIN\" ip daddr { $dns } meta l4proto { tcp, udp } th dport 53 accept"
+        [ -n "$central" ] && echo "    oifname \"$ADMIN\" ip daddr { $central } tcp dport $(central_port) accept"
+        [ -n "$ntp" ] && echo "    oifname \"$ADMIN\" ip daddr { $ntp } udp dport 123 accept"
+        echo "    counter log prefix \"auspex-sortie-refusee \" level warn"
+        echo "  }"
+        echo "  chain forward {"
+        echo "    type filter hook forward priority 0; policy drop;"
+        echo "  }"
+        echo "}"
+        # Toute interface physique autre que l'administration reste muette
+        # (l'écoute, et les ports inutilisés), sockets brutes comprises.
+        echo "table netdev auspex_ecoute {"
+        local i n=0
+        for i in /sys/class/net/*; do
+            i=$(basename "$i")
+            [ -e "/sys/class/net/$i/device" ] && [ "$i" != "$ADMIN" ] || continue
+            echo "  chain egress_$n { type filter hook egress device \"$i\" priority 0; policy drop; }"
+            n=$((n + 1))
+        done
+        echo "}"
+    } > "$RUN/parefeu.nft"
+    nft -f "$RUN/parefeu.nft"
+}
+
+ruleset "" ""                                   # DNS seul, le temps de résoudre les noms
+central=$(ips "$(central_host)")
+ntp=$(ips "${C[NTP]:-}")
+[ -n "$central" ] || { msg "ERREUR : central $(central_host) introuvable (DNS)"; exit 1; }
+ruleset "$central" "$ntp"
+msg "pare-feu : sorties limitées au central ($central:$(central_port))${dns:+, DNS $dns}${ntp:+, NTP $ntp} ; écoute $ECOUTE muette"

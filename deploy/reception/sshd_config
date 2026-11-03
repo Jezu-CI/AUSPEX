@@ -1,0 +1,45 @@
+# Service de réception des capteurs Auspex (sshd sans privilèges).
+Port 2222
+HostKey /var/lib/reception/ssh_host_ed25519_key
+PidFile none
+AuthorizedKeysFile /etc/auspex-reception/authorized_keys
+AllowUsers capteur
+StrictModes no
+
+# Clés uniquement, Ed25519 uniquement, algorithmes récents
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+HostbasedAuthentication no
+UsePAM no
+PermitRootLogin no
+PermitEmptyPasswords no
+PubkeyAcceptedAlgorithms ssh-ed25519
+HostKeyAlgorithms ssh-ed25519
+KexAlgorithms sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+
+# Ni shell, ni terminal, ni redirection : seule la commande imposée par la clé
+PermitTTY no
+AllowTcpForwarding no
+AllowAgentForwarding no
+AllowStreamLocalForwarding no
+X11Forwarding no
+PermitTunnel no
+GatewayPorts no
+PermitUserEnvironment no
+PermitUserRC no
+DisableForwarding yes
+
+# Limites
+MaxAuthTries 3
+MaxSessions 1
+MaxStartups 10:30:60
+LoginGraceTime 20
+ClientAliveInterval 30
+ClientAliveCountMax 4
+
+# Journal (sortie du conteneur) : capteur, adresse et empreinte de clé à chaque connexion
+LogLevel INFO
+SyslogFacility AUTH

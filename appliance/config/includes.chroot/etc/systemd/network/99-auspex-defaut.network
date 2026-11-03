@@ -1,0 +1,7 @@
+# Par défaut, aucune interface n'est configurée (ni adresse, ni DHCP, ni lien
+# local) : seules celles décrites par auspex-reseau (/run/systemd/network) le sont.
+[Match]
+Name=*
+
+[Link]
+Unmanaged=yes

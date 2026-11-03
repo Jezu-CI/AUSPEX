@@ -1,0 +1,158 @@
+[
+ {
+  "file": "01-trusted-hosts-refus.png",
+  "stage": "Trusted hosts",
+  "title": "Connexion refusée hors des adresses autorisées",
+  "text": "agent n'est autorisé que depuis 10.20.0.0/24 ; depuis 8.8.8.8, la requête est refusée avant toute action et la session fermée."
+ },
+ {
+  "file": "02-mfa-choix-sombre.png",
+  "stage": "Double authentification",
+  "title": "Choix de la méthode (mode sombre)",
+  "text": "Première connexion : application d'authentification (recommandée) ou code par e-mail."
+ },
+ {
+  "file": "03-mfa-qr-sombre.png",
+  "stage": "Double authentification",
+  "title": "Inscription : QR code (mode sombre)",
+  "text": "Le QR code se scanne avec Aegis, FreeOTP, Google ou Microsoft Authenticator, KeePassXC… La clé reste lisible pour une saisie à la main."
+ },
+ {
+  "file": "04-connexion.png",
+  "stage": "Connexion",
+  "title": "Page de connexion de NetBox",
+  "text": "Comptes locaux uniquement."
+ },
+ {
+  "file": "05-mfa-choix.png",
+  "stage": "Double authentification",
+  "title": "Choix de la méthode",
+  "text": "Première connexion : application d'authentification (recommandée) ou code par e-mail."
+ },
+ {
+  "file": "06-mfa-qr.png",
+  "stage": "Double authentification",
+  "title": "Inscription : QR code",
+  "text": "Le QR code se scanne avec Aegis, FreeOTP, Google ou Microsoft Authenticator, KeePassXC… La clé reste lisible pour une saisie à la main."
+ },
+ {
+  "file": "07-mfa-codes-secours.png",
+  "stage": "Double authentification",
+  "title": "Codes de secours",
+  "text": "Dix codes à usage unique, montrés une seule fois."
+ },
+ {
+  "file": "08-mfa-code-incorrect.png",
+  "stage": "Double authentification",
+  "title": "Connexion suivante : code demandé",
+  "text": "Code de l'application ou code de secours ; ici un code incorrect."
+ },
+ {
+  "file": "09-mfa-verrouillage.png",
+  "stage": "Double authentification",
+  "title": "Verrouillage après 5 échecs",
+  "text": "5 minutes, puis 10, 20… jusqu'à 24 h tant qu'aucune connexion ne réussit. Chaque échec est journalisé."
+ },
+ {
+  "file": "10-mfa-email.png",
+  "stage": "Double authentification",
+  "title": "Code par e-mail",
+  "text": "Pour les équipes sans téléphone professionnel : code de 8 chiffres, valable 10 minutes. L'adresse est masquée à l'écran."
+ },
+ {
+  "file": "11-mfa-email-message.png",
+  "stage": "Double authentification",
+  "title": "Message reçu",
+  "text": "Le message indique l'adresse du poste qui se connecte et quoi faire si ce n'est pas vous."
+ },
+ {
+  "file": "12-tableau-de-bord.png",
+  "stage": "Tableau de bord",
+  "title": "Accueil de NetBox avec les widgets Auspex",
+  "text": "Écarts ouverts, état du service, inventaire observé, matrice des zones. Chacun réorganise son tableau (ajout, retrait, déplacement, taille)."
+ },
+ {
+  "file": "13-ecarts.png",
+  "stage": "Tableau de bord",
+  "title": "Page « Écarts de conformité »",
+  "text": "Tous les écarts ouverts, filtrables par gravité, origine, zone et recherche libre."
+ },
+ {
+  "file": "14-carte.png",
+  "stage": "Carte",
+  "title": "Carte interactive des actifs",
+  "text": "Zones de gestion (tiers) à gauche, zones industrielles (Purdue) à droite ; flux observés agrégés, en rouge ceux en écart. Zoom à la molette, déplacement à la souris."
+ },
+ {
+  "file": "15-carte-selection.png",
+  "stage": "Carte",
+  "title": "Détail d'un actif sélectionné",
+  "text": "Identification, écarts et flux de l'actif ; chaque flux mène à l'actif d'en face."
+ },
+ {
+  "file": "16-carte-ecarts.png",
+  "stage": "Carte",
+  "title": "Filtre « Écarts seulement »",
+  "text": "Seuls les flux en écart et les actifs concernés restent en avant."
+ },
+ {
+  "file": "17-audits.png",
+  "stage": "Exports d'audit",
+  "title": "Page « Exports d'audit »",
+  "text": "Exports signés par référentiel, produits par le service ou à la demande ; empreinte de la clé à communiquer à l'auditeur, commandes de vérification sans Auspex."
+ },
+ {
+  "file": "18-rapport-synthese.png",
+  "stage": "Exports d'audit",
+  "title": "Rapport NIS2 : synthèse",
+  "text": "Constat par exigence (écarts ouverts, sans écart, preuve, non évalué), périmètre observé, couverture des flux par les règles."
+ },
+ {
+  "file": "19-rapport-exigence.png",
+  "stage": "Exports d'audit",
+  "title": "Rapport NIS2 : exigence par exigence",
+  "text": "Pour chaque exigence : apport d'Auspex, ce qui reste hors périmètre, écarts avec chemin, gravité et dates d'observation."
+ },
+ {
+  "file": "20-tableau-de-bord-sombre.png",
+  "stage": "Tableau de bord",
+  "title": "Accueil de NetBox avec les widgets Auspex (mode sombre)",
+  "text": "Écarts ouverts, état du service, inventaire observé, matrice des zones. Chacun réorganise son tableau (ajout, retrait, déplacement, taille)."
+ },
+ {
+  "file": "21-ecarts-sombre.png",
+  "stage": "Tableau de bord",
+  "title": "Page « Écarts de conformité » (mode sombre)",
+  "text": "Tous les écarts ouverts, filtrables par gravité, origine, zone et recherche libre."
+ },
+ {
+  "file": "22-carte-sombre.png",
+  "stage": "Carte",
+  "title": "Carte interactive des actifs (mode sombre)",
+  "text": "Zones de gestion (tiers) à gauche, zones industrielles (Purdue) à droite ; flux observés agrégés, en rouge ceux en écart. Zoom à la molette, déplacement à la souris."
+ },
+ {
+  "file": "23-sso-connexion.png",
+  "stage": "Connexion unique",
+  "title": "Page de connexion avec le bouton SSO",
+  "text": "auth.primary: oidc — bouton « Keycloak » ; le formulaire local reste pour le brise-glace."
+ },
+ {
+  "file": "24-sso-fournisseur.png",
+  "stage": "Connexion unique",
+  "title": "Page du fournisseur d'identité",
+  "text": "Redirection vers le fournisseur (ici Keycloak) ; sa propre MFA s'applique."
+ },
+ {
+  "file": "25-sso-refus.png",
+  "stage": "Connexion unique",
+  "title": "Refus : hors du groupe exigé",
+  "text": "Page de refus propre, sans détail technique ; l'événement auspex_sso_refused est journalisé."
+ },
+ {
+  "file": "26-compte-local-refuse.png",
+  "stage": "Connexion unique",
+  "title": "Compte local refusé",
+  "text": "Avec une méthode principale, seul le brise-glace peut encore se connecter en local."
+ }
+]

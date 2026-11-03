@@ -1,0 +1,43 @@
+# Inventaire des bibliothèques d'authentification de l'image NetBox officielle
+# (à lancer à la main avant de changer de version de NetBox).
+name: Image NetBox — bibliothèques d'authentification
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version de l'image netboxcommunity/netbox"
+        default: "v4.4"
+permissions:
+  contents: read
+jobs:
+  inventaire:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Modules présents dans l'image
+        run: |
+          IMG="netboxcommunity/netbox:${{ inputs.version }}"
+          docker pull -q "$IMG" >/dev/null
+          for m in ldap django_auth_ldap social_core.backends.open_id_connect social_core.backends.saml onelogin.saml2 xmlsec jwt cryptography; do
+            if docker run --rm --entrypoint /opt/netbox/venv/bin/python "$IMG" -c "import $m" 2>/dev/null; then
+              echo "::notice title=présent::$m"
+            else
+              echo "::warning title=absent::$m"
+            fi
+          done
+          v=$(docker run --rm --entrypoint /opt/netbox/venv/bin/python "$IMG" -c "import social_core; print(social_core.__version__)" 2>/dev/null)
+          echo "::notice title=social-auth-core::$v"
+          docker run --rm --entrypoint sh "$IMG" -c 'ls -la /opt/netbox/netbox/netbox/ldap_config.py /etc/netbox/config/ 2>&1; dpkg -l | grep -i xmlsec' | sed 's/^/::notice title=fichiers::/'
+      - name: Marque et logos (gabarits, fichiers statiques)
+        run: |
+          IMG="netboxcommunity/netbox:${{ inputs.version }}"
+          note() { printf '::notice title=%s::%s\n' "$1" "$(cat | head -c 3500 | sed ':a;N;$!ba;s/\n/%0A/g')"; }
+          run() { docker run --rm --entrypoint sh "$IMG" -c "$1" 2>&1; }
+          run 'cd /opt/netbox/netbox && ls static/*.svg static/*.ico static/img 2>/dev/null; find static -maxdepth 2 -iname "*logo*" -o -maxdepth 2 -iname "*icon*.svg" -o -maxdepth 2 -iname "favicon*"' | note "statiques"
+          run 'cd /opt/netbox/netbox/templates && grep -rn "logo\|favicon" --include=*.html . | head -30' | note "gabarits logo"
+          run 'cd /opt/netbox/netbox/templates && grep -rn "NetBox" --include=*.html . | grep -v "{#" | head -40' | note "gabarits NetBox"
+          run 'cd /opt/netbox/netbox/templates && grep -rn "Cloud\|Enterprise\|Community" --include=*.html . | head -20' | note "gabarits pied de page"
+          run 'cd /opt/netbox/netbox/templates && grep -rn "stylesheet\|static .*css" --include=*.html base/ | head -20' | note "feuilles de style"
+          run 'cd /opt/netbox/netbox && ls static/*.css static/dist 2>/dev/null | head; grep -o "\-\-tblr-primary[^;]*;" static/netbox-light.css 2>/dev/null | head -3; grep -o "\.navbar-vertical[^{]*{[^}]*}" static/netbox-light.css 2>/dev/null | head -3' | note "css"
+          run 'cd /opt/netbox/netbox/templates && grep -n -i -B2 -A6 "navbar-brand" base/layout.html | head -40' | note "logo du menu"
+          run 'cd /opt/netbox/netbox/templates && grep -n -i -B2 -A8 "logo" login.html | head -30' | note "logo connexion"
+          run 'cd /opt/netbox/netbox && grep -rn -i "edition" templates/base/layout.html templates/login.html netbox/settings.py | head -20' | note "edition"

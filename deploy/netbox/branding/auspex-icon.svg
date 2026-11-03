@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Auspex">
+<g>
+  <circle cx="32" cy="32" r="30" fill="#1d262b"/>
+  <path d="M32 32 L32 2 A30 30 0 0 1 57.98 17.00 Z" fill="#3ddc84" fill-opacity="0.28"/>
+  <circle cx="32" cy="32" r="27.60" fill="none" stroke="#3ddc84" stroke-width="2.70"/>
+  <circle cx="32" cy="32" r="18.00" fill="none" stroke="#3ddc84" stroke-width="1.50" stroke-opacity="0.75"/>
+  <circle cx="32" cy="32" r="8.40" fill="none" stroke="#3ddc84" stroke-width="1.50" stroke-opacity="0.6"/>
+  <path d="M32 4.40 V59.60 M4.40 32 H59.60" stroke="#3ddc84" stroke-width="0.90" stroke-opacity="0.45"/>
+  <line x1="32" y1="32" x2="56.00" y2="18.20" stroke="#3ddc84" stroke-width="2.40" stroke-linecap="round"/>
+  <circle cx="42.80" cy="17.60" r="2.70" fill="#3ddc84"/>
+  <circle cx="19.40" cy="41.00" r="2.10" fill="#f2b33d"/>
+  <circle cx="32" cy="32" r="2.10" fill="#3ddc84"/>
+</g>
+</svg>

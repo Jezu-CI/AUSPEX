@@ -1,0 +1,19 @@
+[Unit]
+Description=Auspex : mises à jour signées de l'analyse (A/B, retour automatique)
+After=auspex-capteur.service auspex-racine.service systemd-networkd.service
+Requires=auspex-racine.service
+ConditionPathExists=/run/auspex/capteur.env
+
+[Service]
+ExecStart=/usr/local/sbin/auspex-maj
+Restart=on-failure
+RestartSec=60
+# Racine : monte l'image d'analyse et pilote auspex-capteur. Aucun espace de
+# montage privé (PrivateTmp, Protect*…) : le montage doit être vu par le système.
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

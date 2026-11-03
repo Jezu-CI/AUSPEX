@@ -1,0 +1,82 @@
+# Site web du projet : python tools/site.py --build (sources assemblées dans build/site-src)
+site_name: Auspex
+site_description: CMDB passive IT/OT — inventaire sans agent, contrôle de la segmentation, preuves NIS2 / DORA / IEC 62443
+site_url: https://jezu-ci.github.io/AUSPEX/
+repo_url: https://github.com/Jezu-CI/AUSPEX
+repo_name: Jezu-CI/AUSPEX
+edit_uri: ""
+copyright: Auspex — concept de Yann Mathon · licence AGPL v3 · basé sur NetBox Community (Apache 2.0)
+docs_dir: build/site-src
+site_dir: build/site
+
+theme:
+  name: material
+  language: fr
+  logo: assets/auspex-icon.svg
+  favicon: assets/auspex-icon.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-night, name: Mode sombre }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-sunny, name: Mode clair }
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - assets/auspex.css
+
+plugins:
+  - search:
+      lang: fr
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # Ancres comme GitHub (accents conservés) : les liens fonctionnent aux deux endroits
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds: { case: lower }
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+
+nav:
+  - Accueil: index.md
+  - Télécharger: telecharger.md
+  - Captures d'écran: captures.md
+  - Guide: guide.md
+  - Documentation:
+      - documentation/index.md
+      - Authentification et accès: documentation/01-authentification.md
+      - Capteurs: documentation/02-capteur.md
+      - Exports d'audit: documentation/03-audits.md
+      - Exploitation: documentation/04-exploitation.md
+      - Référence de configuration: documentation/05-configuration.md
+      - Preuves automatisées: documentation/06-preuves-ci.md
+  - Projet:
+      - Versions: versions.md
+      - Sécurité: securite.md
+      - Composants tiers: composants-tiers.md

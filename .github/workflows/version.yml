@@ -1,0 +1,133 @@
+name: Publication d'une version
+
+# Tests, ISO du capteur et image de mise à jour, SBOM, empreintes, signature
+# Sigstore et provenance (SLSA), vérification comme un utilisateur (fichiers
+# altérés refusés), puis version GitHub en BROUILLON (relue et publiée à la main ; le tag vX.Y.Z est créé à la
+# publication, sur le commit construit ici).
+#
+# Deux façons de lancer :
+# - Actions → « Publication d'une version » → Run workflow (publier = oui) ;
+# - pousser un tag vX.Y.Z.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      publier:
+        description: "Créer le brouillon de version (sinon : fichiers en artefact seulement)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  id-token: write       # certificat Sigstore éphémère (identité du workflow)
+  attestations: write   # provenance des fichiers
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Version cohérente (code, journal, tag)
+        id: v
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          PUBLIER: ${{ inputs.publier }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/auspex/__init__.py)
+          tag="v$code"
+          if [ "$EVENT" = push ] && [ "$tag" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} ≠ version du code $tag"; exit 1
+          fi
+          grep -q "^## \[$code\]" CHANGELOG.md || { echo "::error::CHANGELOG.md sans entrée $code"; exit 1; }
+          if grep "^## \[$code\]" CHANGELOG.md | grep -q "en préparation"; then
+            echo "::error::CHANGELOG.md : remplacer « en préparation » par la date de publication"; exit 1
+          fi
+          publier=false
+          if [ "$EVENT" = push ] || [ "$PUBLIER" = true ]; then publier=true; fi
+          if [ "$publier" = true ] && gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::la version $tag existe déjà (brouillon ou publiée)"; exit 1
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publier=$publier" >> "$GITHUB_OUTPUT"
+          echo "Version $tag, commit ${GITHUB_SHA::12}, brouillon : $publier"
+      - name: Tests
+        run: |
+          pip install -q -e ".[dev]" cyclonedx-bom
+          pytest -q
+      - name: Image du capteur, ISO et image de mise à jour
+        run: |
+          docker build -q -t auspex-sensor:version sensor >/dev/null
+          tools/appliance-rootfs.sh auspex-sensor:version appliance/out
+          docker run --rm --privileged -v "$PWD:/src" debian:bookworm /src/appliance/build.sh
+          sudo chown -R "$(id -u):$(id -g)" appliance/out
+      - name: SBOM, notes et empreintes
+        env:
+          V: ${{ steps.v.outputs.code }}
+        run: |
+          mkdir -p version
+          cyclonedx-py environment --of JSON -o version/auspex-sbom.cdx.json
+          cp appliance/out/auspex-capteur-*.iso appliance/out/auspex-capteur-*.squashfs version/
+          awk -v h="## [$V]" 'index($0, h) == 1 {on=1; next} on && /^## \[/ {exit} on' CHANGELOG.md > version/NOTES.md
+          VERIFIER='https://jezu-ci.github.io/AUSPEX/telecharger/#v%C3%A9rifier-un-fichier-t%C3%A9l%C3%A9charg%C3%A9'
+          printf '\n---\nVérifier l'"'"'origine et l'"'"'intégrité des fichiers : [Télécharger → Vérifier](%s). Commit : %s\n' "$VERIFIER" "$GITHUB_SHA" >> version/NOTES.md
+          (cd version && sha256sum auspex-* > SHA256SUMS && cat SHA256SUMS)
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Signature de SHA256SUMS (Sigstore, sans clé)
+        run: cosign sign-blob --yes --bundle version/SHA256SUMS.sigstore.json version/SHA256SUMS
+      - name: Provenance des fichiers (SLSA)
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: version/SHA256SUMS
+      - name: Vérification, comme un utilisateur
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" version/auspex-provenance.sigstore.json
+          tools/verifier-version.sh version
+          for f in version/auspex-capteur-*.iso version/auspex-sbom.cdx.json; do
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" \
+              --bundle version/auspex-provenance.sigstore.json \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/version.yml"
+          done
+          # Un fichier altéré doit être refusé, une liste d'empreintes altérée aussi
+          t=$(mktemp -d)
+          cp version/SHA256SUMS version/SHA256SUMS.sigstore.json version/auspex-sbom.cdx.json "$t/"
+          echo " " >> "$t/auspex-sbom.cdx.json"
+          if tools/verifier-version.sh "$t"; then echo "::error::fichier altéré accepté"; exit 1; fi
+          (cd "$t" && sed -i "/auspex-sbom/d" SHA256SUMS && sha256sum auspex-sbom.cdx.json >> SHA256SUMS)
+          if tools/verifier-version.sh "$t"; then echo "::error::SHA256SUMS altéré accepté"; exit 1; fi
+          if gh attestation verify "$t/auspex-sbom.cdx.json" --repo "$GITHUB_REPOSITORY" \
+               --bundle version/auspex-provenance.sigstore.json; then
+            echo "::error::provenance acceptée pour un fichier altéré"; exit 1
+          fi
+          echo "Altérations refusées : fichier, liste d'empreintes, provenance"
+      - name: Version GitHub (brouillon)
+        if: steps.v.outputs.publier == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" \
+            --title "Auspex $TAG" \
+            --notes-file version/NOTES.md version/auspex-* version/SHA256SUMS*
+          echo "::notice title=Brouillon prêt::Releases → $TAG : relire puis « Publish release »"
+      - name: Fichiers de la version (sans brouillon)
+        if: steps.v.outputs.publier != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: version
+          path: version/
+          retention-days: 7

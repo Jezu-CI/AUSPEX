@@ -1,0 +1,42 @@
+[Unit]
+Description=Auspex : analyse (Zeek) et envoi des logs au central
+Requires=auspex-reseau.service systemd-networkd.service auspex-racine.service
+After=auspex-reseau.service systemd-networkd.service auspex-racine.service
+ConditionPathExists=/run/auspex/capteur.env
+
+[Service]
+EnvironmentFile=/run/auspex/capteur.env
+EnvironmentFile=/run/auspex/racine.env
+ExecStartPre=+/bin/echo "auspex: capteur démarré (écoute ${ECOUTE})"
+ExecStart=/opt/auspex/entrypoint.sh live ${ECOUTE}
+Restart=always
+RestartSec=10
+
+# Image d'analyse (Zeek, ICSNPP) en racine dédiée, en lecture seule : image
+# d'usine ou mise à jour signée, montée par auspex-racine
+RootDirectory=/run/auspex/racine
+MountAPIVFS=yes
+BindPaths=/var/lib/auspex-capteur/logs:/logs /var/lib/auspex-capteur/cle:/etc/auspex-capteur
+BindReadOnlyPaths=-/etc/resolv.conf -/etc/hosts
+TemporaryFileSystem=/tmp /run
+ReadOnlyPaths=/
+
+# Seules capacités : capture (et réglage) de l'interface d'écoute
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_PACKET AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

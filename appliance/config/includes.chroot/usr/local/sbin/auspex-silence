@@ -1,0 +1,22 @@
+#!/bin/bash
+# Silence au démarrage : AUCUNE trame ne sort par aucune interface physique tant
+# que la configuration n'est pas lue (on ne sait pas encore laquelle écoute).
+# Crochet egress : couvre aussi les sockets brutes (DHCP, ARP…), que le pare-feu
+# classique ne voit pas. auspex-parefeu le remplace par la configuration réelle.
+set -euo pipefail
+. /usr/local/lib/auspex/lib.sh
+trap 'msg "ERREUR $(basename "$0") ligne $LINENO : $BASH_COMMAND"' ERR
+rules="table netdev auspex_silence {"
+n=0
+for i in /sys/class/net/*; do
+    i=$(basename "$i")
+    [ -e "/sys/class/net/$i/device" ] || continue
+    rules="$rules
+  chain egress_$n { type filter hook egress device \"$i\" priority 0; policy drop; }"
+    n=$((n + 1))
+done
+rules="$rules
+}"
+[ "$n" -gt 0 ] || { msg "silence : aucune interface physique"; exit 0; }
+printf '%s\n' "$rules" | nft -f -
+msg "silence : $n interface(s) muette(s) jusqu'à la configuration"

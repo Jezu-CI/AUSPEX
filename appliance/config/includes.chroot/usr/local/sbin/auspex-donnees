@@ -1,0 +1,43 @@
+#!/bin/bash
+# Disque de données du capteur (clé, configuration, logs récents).
+# Système en lecture seule : tout ce qui doit survivre au redémarrage est ici.
+#   - disque étiqueté AUSPEX-DATA : monté ;
+#   - sinon, un disque ENTIÈREMENT VIDE (ni partition, ni système de fichiers,
+#     premier Mio à zéro) est formaté. Un disque qui contient quoi que ce soit
+#     n'est jamais touché.
+set -euo pipefail
+. /usr/local/lib/auspex/lib.sh
+trap 'msg "ERREUR $(basename "$0") ligne $LINENO : $BASH_COMMAND"' ERR
+
+dev=$(blkid -L "$DATA_LABEL" 2>/dev/null || true)
+if [ -z "$dev" ]; then
+    live_src=$(findmnt -no SOURCE /run/live/medium 2>/dev/null || true)
+    live_disk=""
+    [ -n "$live_src" ] && live_disk="/dev/$(lsblk -no PKNAME "$live_src" 2>/dev/null | head -1)"
+    # Vrais disques seulement : 256 Mio au moins, en écriture (ni lecteur de
+    # disquette, ni ramdisk, ni boucle, ni CD), et lus en ENTIER : un disque
+    # illisible n'est jamais pris pour un disque vide.
+    for d in $(lsblk -dbnpo NAME,TYPE,SIZE,RO | awk '$2 == "disk" && $3 >= 268435456 && $4 == 0 {print $1}'); do
+        case "$d" in /dev/fd*|/dev/ram*|/dev/zram*|/dev/loop*|/dev/sr*) continue ;; esac
+        [ "$d" = "$live_disk" ] || [ "$d" = "$live_src" ] && continue
+        [ "$(lsblk -no NAME "$d" | wc -l)" -gt 1 ] && continue             # partitions
+        [ -n "$(blkid -p -o value -s TYPE "$d" 2>/dev/null || true)" ] && continue
+        [ -n "$(blkid -p -o value -s PTTYPE "$d" 2>/dev/null || true)" ] && continue
+        total=$(dd if="$d" bs=1048576 count=1 iflag=fullblock status=none 2>/dev/null | wc -c || true)
+        nonzero=$(dd if="$d" bs=1048576 count=1 iflag=fullblock status=none 2>/dev/null | tr -d '\0' | wc -c || true)
+        [ "$total" = 1048576 ] && [ "$nonzero" = 0 ] || continue
+        msg "disque de données vide trouvé ($d) : formatage"
+        mkfs.ext4 -q -L "$DATA_LABEL" -m 1 "$d"
+        dev="$d"
+        break
+    done
+fi
+if [ -z "$dev" ]; then
+    msg "ERREUR : aucun disque de données (étiquette $DATA_LABEL, ou disque entièrement vide)"
+    exit 1
+fi
+mkdir -p "$DATA"
+mountpoint -q "$DATA" || mount -o nodev,nosuid,noexec "$dev" "$DATA"
+mkdir -p "$DATA/logs" "$DATA/cle" "$DATA/config"
+chmod 700 "$DATA/cle" "$DATA/config"
+msg "disque de données monté ($dev)"

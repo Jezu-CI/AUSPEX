@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auspex"
+version = "0.1.0"
+description = "CMDB open source passive IT/OT : inventaire sans agent, conformité de segmentation, alertes SIEM"
+readme = "README.md"
+license = { text = "AGPL-3.0-only" }
+requires-python = ">=3.10"
+dependencies = [
+    "PyYAML>=6.0",
+    "openpyxl>=3.1",
+    # Signature Ed25519 des exports d'audit
+    "cryptography>=42",
+]
+
+[project.optional-dependencies]
+# Django : tests du plugin NetBox (même version majeure que NetBox 4.4)
+# zxing-cpp + numpy : relecture des QR codes générés par un vrai décodeur
+dev = ["pytest>=8", "django>=5.2,<5.3", "zxing-cpp>=2.2", "numpy"]
+
+[project.scripts]
+auspex = "auspex.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+auspex = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

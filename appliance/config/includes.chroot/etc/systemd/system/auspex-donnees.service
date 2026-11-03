@@ -1,0 +1,14 @@
+[Unit]
+Description=Auspex : disque de données du capteur
+DefaultDependencies=no
+After=local-fs.target systemd-udev-trigger.service
+Before=auspex-config.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/bin/udevadm settle --timeout=30
+ExecStart=/usr/local/sbin/auspex-donnees
+
+[Install]
+WantedBy=multi-user.target

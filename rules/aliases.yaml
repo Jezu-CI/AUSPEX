@@ -1,0 +1,37 @@
+# Normalisation des valeurs d'identification.
+#
+# aliases : différentes façons de nommer la même chose. Sans cette table,
+#   « Rockwell Automation » (préfixe MAC) et « Rockwell Automation/Allen-Bradley »
+#   (identité CIP) seraient vus comme deux fabricants concurrents, et la
+#   confiance baisserait alors que les deux indices sont d'accord.
+#
+# generic : catégories larges. Elles ne servent que faute de mieux et ne
+#   concurrencent jamais une valeur précise.
+
+aliases:
+  vendor:
+    "Rockwell Automation/Allen-Bradley": "Rockwell Automation"
+    "Allen-Bradley": "Rockwell Automation"
+    "Siemens AG": "Siemens"
+    "Schneider Electric SE": "Schneider Electric"
+    # Relevés sur captures réelles (BACnet I-Am / vendor-name, certificats)
+    "Tridium Inc.": "Tridium"
+    "Tridium, Inc.": "Tridium"
+    "The Watt Stopper Inc.": "Watt Stopper"
+    "Automated Logic Corporation": "Automated Logic"
+    "Honeywell International": "Honeywell"
+    "Johnson Controls Inc.": "Johnson Controls"
+    "Moxa Networking Co., Ltd.": "Moxa"
+  device_type:
+    "Programmable Logic Controller": "Automate"
+    "PLC": "Automate"
+    "Communications Adapter": "Coupleur de communication"
+    "Human-Machine Interface": "IHM"
+    "Generic Device (deprecated)": "Équipement industriel"
+
+generic:
+  device_type:
+    - "Équipement industriel"
+    - "Équipement embarqué"
+  os_family:
+    - "Unix/Linux"

@@ -1,0 +1,13 @@
+[Unit]
+Description=Auspex : racine de l'analyse (image d'usine ou mise à jour signée)
+Requires=auspex-donnees.service
+After=auspex-donnees.service auspex-config.service
+Before=auspex-capteur.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/auspex-racine --demarrage
+
+[Install]
+WantedBy=multi-user.target

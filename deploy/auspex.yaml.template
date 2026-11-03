@@ -1,0 +1,100 @@
+# Configuration du central Auspex déployé par docker compose.
+# Adapter les zones et les sorties d'alertes, puis : docker compose restart auspex
+# (le service relit aussi ce fichier à chaque cycle).
+version: 1
+channel: stable
+state_dir: /var/lib/auspex/state
+retention_days: 180
+# organisation: Ville de Exemple  # nom affiché en tête des rapports d'audit
+
+# Exports d'audit signés, produits par le service (page « Exports d'audit » de NetBox).
+# À la demande : auspex audit export nis2|dora|iec62443|iso27001|anssi
+audit:
+  referentiels: []                 # ex. [nis2, iec62443]
+  frequence: mensuelle             # quotidienne | hebdomadaire | mensuelle
+  conserver: 24                    # exports gardés par référentiel
+
+zones:
+  # À remplacer par les zones réelles du site.
+  - { name: T0-AD,         class: tier0,     prefixes: [10.0.0.0/24] }
+  - { name: T1-serveurs,   class: tier1,     prefixes: [10.1.0.0/16] }
+  - { name: T2-postes,     class: tier2,     prefixes: [10.2.0.0/16] }
+  - { name: ADMIN-bastion, class: admin,     prefixes: [10.9.0.0/24] }
+  - { name: OT-DMZ,        class: purdue3.5, prefixes: [172.16.35.0/24] }
+  - { name: OT-N2,         class: purdue2,   prefixes: [172.16.2.0/24] }
+
+# Capteurs. Avec « key », le capteur envoie lui-même ses logs au central
+# (port 2222) : clé affichée par le capteur (commande « cle »), empreinte du
+# central à saisir sur le capteur (« auspex capteur empreinte »).
+sensors: []
+#  - name: capteur-ot               # minuscules, chiffres, tirets : nom du dossier de réception
+#    zone: OT-N2
+#    interface: eth1
+#    key: "ssh-ed25519 AAAA…"       # clé d'envoi du capteur
+#    allow: [10.9.0.20]             # adresse du capteur (recommandé)
+
+flow_rules:
+  file: /etc/auspex/regles-flux.csv
+
+alerts:
+  persistent_after_days: 3
+  unused_rule_after_days: 90
+  outputs:
+    - { type: file, path: /var/lib/auspex/alertes.jsonl }
+    # - { type: syslog, url: "tls://siem.client.local:6514", format: cef }
+
+# NetBox du même déploiement, joint par le réseau Docker interne.
+netbox:
+  url: http://netbox:8080
+  allow_http_internal: true
+  token_env: NETBOX_TOKEN
+  silent_after_days: 30
+
+modules: []
+
+# Restriction des connexions à NetBox par IP source (plugin Auspex).
+# Relue par NetBox dès qu'elle change : pas de redémarrage nécessaire.
+access:
+  default: deny_if_unlisted        # utilisateur sans règle : refusé
+  # Reverse proxy TLS dont on accepte l'en-tête X-Forwarded-For. Un proxy
+  # installé sur la machine du central arrive par la passerelle du réseau
+  # interne : 172.31.250.1 avec la plage par défaut.
+  trusted_proxies: []
+  trusted_hosts: []
+  #  - { user: user1,      allow: [10.10.1.2/32, 172.16.20.2/32] }
+  #  - { group: admins-t0, allow: [10.0.10.0/28] }
+
+auth:
+  # Méthode de connexion principale (sinon : comptes locaux seulement)
+  # primary: ldaps
+  # ldaps:
+  #   servers: [ldaps://dc01.exemple.local]
+  #   bind_dn: "CN=svc-auspex,OU=Services,DC=exemple,DC=local"   # mot de passe : AUSPEX_LDAP_BIND_PASSWORD (.env)
+  #   user_search_base: "OU=Utilisateurs,DC=exemple,DC=local"
+  #   group_search_base: "OU=Groupes,DC=exemple,DC=local"
+  #   require_group: "CN=Auspex-Utilisateurs,OU=Groupes,DC=exemple,DC=local"
+  #   ca_file: ca-ad.pem
+  break_glass:
+    user: admin                    # compte administrateur local de NetBox
+    mfa: totp                      # code à usage unique, exigé pour tout compte local et LDAPS
+    allow: []                      # vide : uniquement depuis la machine du central
+  mfa:
+    methods: [totp]                # ajouter « email » pour les équipes sans téléphone professionnel,
+                                   # « webauthn » pour les clés de sécurité (FIDO2, Windows Hello)
+  #  webauthn:
+  #    domaine: auspex.exemple.fr
+  #    adresse: https://auspex.exemple.fr
+  # Carte à puce (certificat client), sur le port carte du front HTTPS :
+  # carte:
+  #   adresse: https://auspex.exemple.fr:8443
+  #   autorites: tls/cartes-ac.pem
+  #   revocation: tls/cartes-lcr.pem
+  #   identifiant: upn_court       # upn | upn_court | email | cn
+  # Avec « email » : serveur d'envoi. Mot de passe éventuel : AUSPEX_SMTP_PASSWORD dans .env.
+  #  email:
+  #    smtp_server: smtp.exemple.fr
+  #    port: 587
+  #    security: starttls          # starttls | tls | none (relais interne sans chiffrement)
+  #    from: auspex@exemple.fr
+  #    username: auspex            # facultatif
+  #    ca_file: ca-interne.pem     # facultatif : autorité interne, à côté de ce fichier

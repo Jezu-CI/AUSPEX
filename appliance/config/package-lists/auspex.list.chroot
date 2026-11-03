@@ -1,0 +1,27 @@
+# Système minimal du capteur (pas de serveur SSH, pas de compte utilisable)
+linux-image-amd64
+live-boot
+systemd-sysv
+nftables
+openssh-client
+openssl
+rsync
+ca-certificates
+chrony
+iproute2
+ethtool
+whiptail
+e2fsprogs
+dosfstools
+util-linux
+kbd
+console-setup
+keyboard-configuration
+# Pilotes et microcode des cartes réseau et processeurs courants
+firmware-linux-free
+firmware-misc-nonfree
+firmware-realtek
+firmware-bnx2
+firmware-bnx2x
+intel-microcode
+amd64-microcode

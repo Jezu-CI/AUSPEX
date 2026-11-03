@@ -1,0 +1,77 @@
+#!/bin/bash
+# Réseau du capteur (systemd-networkd), généré depuis capteur.conf.
+#   - écoute : interface montée, promiscuité, SANS adresse, sans ARP ni IPv6,
+#     sans LLDP ; délestages matériels coupés (Zeek voit les vrais paquets) ;
+#   - administration : DHCP ou adresse fixe ; DNS fixés par capteur.conf.
+set -euo pipefail
+. /usr/local/lib/auspex/lib.sh
+trap 'msg "ERREUR $(basename "$0") ligne $LINENO : $BASH_COMMAND"' ERR
+[ -f "$RUN/capteur.env" ] || exit 0
+load_conf "$CONF"
+ADMIN=$(sed -n 's/^ADMIN=//p' "$RUN/capteur.env"); ECOUTE=$(sed -n 's/^ECOUTE=//p' "$RUN/capteur.env")
+N=/run/systemd/network
+mkdir -p "$N"
+cat > "$N/10-auspex-ecoute.network" <<NET
+[Match]
+Name=$ECOUTE
+
+[Link]
+ARP=no
+Promiscuous=yes
+RequiredForOnline=no
+ActivationPolicy=always-up
+
+[Network]
+DHCP=no
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+LLDP=no
+EmitLLDP=no
+ConfigureWithoutCarrier=yes
+NET
+if [ "${C[ADMIN_ADRESSE]}" = dhcp ]; then
+    addr="DHCP=ipv4"
+else
+    addr="Address=${C[ADMIN_ADRESSE]}
+Gateway=${C[ADMIN_PASSERELLE]}"
+fi
+cat > "$N/20-auspex-admin.network" <<NET
+[Match]
+Name=$ADMIN
+
+[Network]
+$addr
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+LLDP=no
+EmitLLDP=no
+
+[DHCPv4]
+UseDNS=no
+UseNTP=no
+UseHostname=no
+SendHostname=no
+NET
+# Toute autre interface : ignorée (ni adresse, ni DHCP).
+cat > "$N/99-auspex-autres.network" <<NET
+[Match]
+Name=*
+
+[Link]
+Unmanaged=yes
+NET
+# Fichiers écrits avant le démarrage de systemd-networkd (pas besoin de D-Bus) ;
+# en cas de reconfiguration depuis la console, networkd est redémarré.
+if systemctl is-active -q systemd-networkd; then
+    systemctl restart systemd-networkd
+fi
+if [ -n "${C[NTP]:-}" ]; then
+    mkdir -p /etc/chrony/conf.d
+    printf 'server %s iburst\n' ${C[NTP]//,/ } > /etc/chrony/conf.d/auspex.conf
+    systemctl restart chrony || true
+fi
+# Délestages matériels coupés sur l'écoute (Zeek doit voir les vrais paquets).
+( for _ in $(seq 30); do
+      ethtool -K "$ECOUTE" gro off lro off gso off tso off 2>/dev/null && break; sleep 1
+  done ) &
+msg "réseau : administration $ADMIN (${C[ADMIN_ADRESSE]}), écoute $ECOUTE sans adresse"

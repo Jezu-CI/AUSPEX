@@ -1,0 +1,114 @@
+/* Charte « Scanner Auspex » appliquée à l'interface de NetBox.
+   Gris acier et vert phosphore ; menu latéral sombre dans les deux thèmes.
+   Chargée après les feuilles de NetBox (voir deploy/netbox/rebrand.py). */
+
+:root, [data-bs-theme="light"] {
+  --auspex-steel: #1d262b;
+  --auspex-steel-2: #243038;
+  --auspex-menu-fg: #c9d6db;
+  --auspex-menu-muted: #8ea3ab;
+  --auspex-green: #12805a;
+  --auspex-green-strong: #0b5a3f;
+  --tblr-primary: #12805a;
+  --tblr-primary-rgb: 18, 128, 90;
+  --tblr-primary-text-emphasis: #0b5a3f;
+  --tblr-primary-bg-subtle: #e2f3eb;
+  --tblr-primary-border-subtle: #a6d8c2;
+  --tblr-link-color: #0f6f4e;
+  --tblr-link-color-rgb: 15, 111, 78;
+  --tblr-link-hover-color: #0b5a3f;
+  --tblr-link-hover-color-rgb: 11, 90, 63;
+  --tblr-body-bg: #f2f5f5;
+  --tblr-body-bg-rgb: 242, 245, 245;
+}
+
+[data-bs-theme="dark"] {
+  --auspex-green: #3ddc84;
+  --auspex-green-strong: #7debb0;
+  --tblr-primary: #3ddc84;
+  --tblr-primary-rgb: 61, 220, 132;
+  --tblr-primary-text-emphasis: #8ff0bb;
+  --tblr-primary-bg-subtle: #10301f;
+  --tblr-primary-border-subtle: #1f6b43;
+  --tblr-link-color: #5fe39b;
+  --tblr-link-color-rgb: 95, 227, 155;
+  --tblr-link-hover-color: #8ff0bb;
+  --tblr-link-hover-color-rgb: 143, 240, 187;
+  --tblr-body-bg: #11181b;
+  --tblr-body-bg-rgb: 17, 24, 27;
+  --tblr-bg-surface: #172024;
+  --tblr-bg-surface-rgb: 23, 32, 36;
+  --tblr-bg-surface-secondary: #1d272c;
+  --tblr-border-color: #2a373d;
+  --tblr-border-color-translucent: rgba(143, 240, 187, 0.08);
+}
+
+/* Boutons principaux : texte sombre sur vert phosphore en thème sombre. */
+[data-bs-theme="dark"] .btn-primary {
+  --tblr-btn-color: #0b1a12;
+  --tblr-btn-hover-color: #0b1a12;
+  --tblr-btn-active-color: #0b1a12;
+}
+
+/* Menu latéral : gris acier dans les deux thèmes. */
+.navbar-vertical {
+  background: linear-gradient(180deg, var(--auspex-steel) 0%, var(--auspex-steel-2) 100%) !important;
+  border-right: 1px solid rgba(61, 220, 132, 0.18) !important;
+  --tblr-navbar-color: var(--auspex-menu-fg);
+  --tblr-navbar-hover-color: #ffffff;
+  --tblr-navbar-active-color: #3ddc84;
+  --tblr-navbar-brand-color: #ffffff;
+}
+.navbar-vertical .motif { display: none !important; }
+.navbar-vertical .nav-link,
+.navbar-vertical .nav-link-title,
+.navbar-vertical .nav-link-icon,
+.navbar-vertical .dropdown-item,
+.navbar-vertical .dropdown-header,
+.navbar-vertical .text-muted,
+.navbar-vertical .text-secondary,
+.navbar-vertical a.text-muted {
+  color: var(--auspex-menu-fg) !important;
+}
+.navbar-vertical .dropdown-header,
+.navbar-vertical .text-muted,
+.navbar-vertical a.text-muted { color: var(--auspex-menu-muted) !important; }
+.navbar-vertical .nav-link:hover,
+.navbar-vertical .dropdown-item:hover,
+.navbar-vertical .dropdown-item:focus {
+  color: #ffffff !important;
+  background: rgba(61, 220, 132, 0.10) !important;
+}
+.navbar-vertical .dropdown-item.active,
+.navbar-vertical .nav-item.active > .nav-link {
+  color: #3ddc84 !important;
+  background: rgba(61, 220, 132, 0.14) !important;
+}
+.navbar-vertical .dropdown-menu {
+  background: transparent !important;
+  border: 0 !important;
+}
+.navbar-vertical .btn,
+.navbar-vertical .btn-ghost-secondary { color: var(--auspex-menu-muted) !important; }
+
+/* Édition de NetBox (« Community ») sous le logo : remplacée par la mention
+   « basé sur NetBox Community » du pied de page. */
+.netbox-edition { display: none !important; }
+
+/* Logo : proportions du logo Auspex (plus large que celui de NetBox). */
+.navbar-brand-image { height: 2.6rem !important; width: auto !important; }
+.login .logo, img.logo { height: 72px; width: auto; }
+
+/* Titres des widgets du tableau de bord : bandeau acier, liseré vert. */
+.card-header.bg-secondary,
+.card-header.text-bg-secondary {
+  background: var(--auspex-steel) !important;
+  color: #e6f2ec !important;
+  border-bottom: 2px solid #3ddc84 !important;
+}
+
+/* Mention « basé sur NetBox » ajoutée en pied de page. */
+.auspex-credit { color: var(--tblr-secondary-color, #6b7b82); font-size: 0.8rem; }
+.navbar-vertical .auspex-credit,
+.navbar-vertical .text-muted,
+.navbar-vertical footer, .navbar-vertical .footer { color: var(--auspex-menu-muted) !important; }

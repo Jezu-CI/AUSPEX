@@ -1,0 +1,115 @@
+#!/bin/bash
+# Console locale du capteur (tty1). Aucun compte, aucune connexion à distance :
+# l'écran affiche l'état ; la configuration se fait ici ou par le support
+# AUSPEX-CONF.
+. /usr/local/lib/auspex/lib.sh
+export TERM=linux NEWT_COLORS='root=,black window=,black border=green,black title=green,black textbox=white,black button=black,green actbutton=black,green entry=white,black'
+VERSION=$(cat /etc/auspex-version 2>/dev/null || echo "?")
+W=76
+
+ifaces() {
+    local i
+    for i in /sys/class/net/*; do
+        i=$(basename "$i"); [ "$i" = lo ] && continue
+        [ -e "/sys/class/net/$i/device" ] || continue
+        printf '%s\t%s %s\n' "$i" "$(cat /sys/class/net/$i/address)" \
+            "$([ "$(cat /sys/class/net/$i/carrier 2>/dev/null)" = 1 ] && echo câble || echo 'sans lien')"
+    done
+}
+
+ask() {  # ask TITRE TEXTE DÉFAUT
+    whiptail --title "$1" --inputbox "$2" 12 $W "$3" 3>&1 1>&2 2>&3
+}
+
+pick_iface() {  # pick_iface TITRE TEXTE
+    local args=() name info
+    while IFS=$'\t' read -r name info; do args+=("$name" "$info"); done < <(ifaces)
+    whiptail --title "$1" --menu "$2" 16 $W 6 "${args[@]}" 3>&1 1>&2 2>&3
+}
+
+configure() {
+    load_conf "$CONF" > /dev/null 2>&1 || true
+    local nom ecoute admin adresse passerelle="" dns ntp central empreinte tmp
+    nom=$(ask "Nom du capteur" "Nom du capteur (minuscules, chiffres, tirets).\nC'est aussi son dossier sur le central." "${C[NOM]:-capteur-1}") || return
+    ecoute=$(pick_iface "Interface d'écoute" "Port SPAN ou TAP : cette interface n'aura AUCUNE adresse et n'émettra rien.") || return
+    admin=$(pick_iface "Interface d'administration" "Interface reliée au réseau d'administration (vers le central).") || return
+    [ "$admin" = "$ecoute" ] && { whiptail --msgbox "Les deux interfaces doivent être différentes." 8 $W; return; }
+    adresse=$(ask "Adresse d'administration" "« dhcp », ou adresse fixe avec masque (ex. 10.9.0.20/24)." "${C[ADMIN_ADRESSE]:-dhcp}") || return
+    [ "$adresse" != dhcp ] && { passerelle=$(ask "Passerelle" "Passerelle du réseau d'administration." "${C[ADMIN_PASSERELLE]:-}") || return; }
+    dns=$(ask "DNS" "Serveur(s) DNS (adresses IP), vide si le central est donné par son adresse IP." "${C[DNS]:-}") || return
+    ntp=$(ask "Heure (NTP)" "Serveur(s) de temps (recommandé : horodatage des logs)." "${C[NTP]:-}") || return
+    central=$(ask "Central Auspex" "Adresse du central, port facultatif (2222 par défaut).\nEx. 10.9.0.10 ou auspex.ville.fr:2222" "${C[CENTRAL]:-}") || return
+    empreinte=$(ask "Empreinte du central" "Sur le central : auspex capteur empreinte\n(forme SHA256:…)" "${C[CENTRAL_EMPREINTE]:-}") || return
+    tmp=$(mktemp)
+    {
+        echo "NOM=$nom"; echo "ADMIN_INTERFACE=mac:$(cat /sys/class/net/$admin/address)"
+        echo "ADMIN_ADRESSE=$adresse"; echo "ADMIN_PASSERELLE=$passerelle"; echo "DNS=$dns"; echo "NTP=$ntp"
+        echo "ECOUTE_INTERFACE=mac:$(cat /sys/class/net/$ecoute/address)"
+        echo "CENTRAL=$central"; echo "CENTRAL_EMPREINTE=$empreinte"
+    } > "$tmp"
+    local errors
+    if ! errors=$(load_conf "$tmp" 2>&1); then
+        whiptail --title "Configuration refusée" --msgbox "${errors//auspex: /}" 16 $W
+        rm -f "$tmp"; return
+    fi
+    install -m 600 "$tmp" "$CONF"; rm -f "$tmp"
+    systemctl restart auspex-config auspex-parefeu auspex-reseau auspex-capteur 2>/dev/null
+    whiptail --msgbox "Configuration enregistrée. Déclarer ce capteur sur le central avec sa clé (menu « Clé d'envoi »)." 9 $W
+}
+
+show_key() {
+    local pub fp
+    pub=$(cat "$DATA/cle/cle.pub" 2>/dev/null | awk '{print $1" "$2}')
+    fp=$(ssh-keygen -l -f "$DATA/cle/cle.pub" 2>/dev/null | awk '{print $2}')
+    whiptail --title "Clé d'envoi du capteur" --msgbox "À déclarer sur le central (auspex.yaml, sensors[].key) :\n\n$pub\n\nEmpreinte : $fp\n\nLe menu « Exporter la clé » l'écrit sur une clé USB étiquetée AUSPEX-CONF." 17 $W
+}
+
+export_key() {
+    local dev; dev=$(blkid -L "$SEED_LABEL" 2>/dev/null)
+    [ -n "$dev" ] || { whiptail --msgbox "Brancher une clé USB formatée en FAT avec l'étiquette AUSPEX-CONF." 8 $W; return; }
+    mkdir -p /run/auspex-export
+    if mount -o nodev,nosuid,noexec "$dev" /run/auspex-export; then
+        cp "$DATA/cle/cle.pub" "/run/auspex-export/$(sed -n 's/^NOM=//p' "$CONF" 2>/dev/null || echo capteur).pub"
+        umount /run/auspex-export && whiptail --msgbox "Clé publique écrite sur la clé USB." 7 $W
+    fi
+}
+
+status() {
+    clear
+    local etat admin ecoute last
+    etat=$(cat "$RUN/etat" 2>/dev/null || echo "démarrage")
+    admin=$(sed -n 's/^ADMIN=//p' "$RUN/capteur.env" 2>/dev/null); ecoute=$(sed -n 's/^ECOUTE=//p' "$RUN/capteur.env" 2>/dev/null)
+    last=$(cat "$DATA/logs/.dernier-envoi" 2>/dev/null || echo "aucun")
+    echo "  AUSPEX — capteur passif ($VERSION)"
+    echo "  ================================================================"
+    echo "  Capteur        : $(sed -n 's/^NOM=//p' "$RUN/capteur.env" 2>/dev/null || echo '—')   état : $etat"
+    [ -n "$admin" ] && echo "  Administration : $admin $(ip -4 -o addr show "$admin" 2>/dev/null | awk '{print $4}' | head -1)"
+    if [ -n "$ecoute" ]; then
+        if [ -z "$(ip -o addr show "$ecoute" 2>/dev/null)" ]; then echo "  Écoute         : $ecoute (aucune adresse, rien n'est émis)"
+        else echo "  Écoute         : $ecoute — ATTENTION : une adresse est présente"; fi
+    fi
+    echo "  Central        : $(sed -n 's/^AUSPEX_CENTRAL=//p' "$RUN/capteur.env" 2>/dev/null || echo '—')"
+    echo "  Analyse (Zeek) : $(systemctl is-active auspex-capteur 2>/dev/null)"
+    echo "  Dernier envoi  : $last"
+    echo "  Clé d'envoi    : $(ssh-keygen -l -f "$DATA/cle/cle.pub" 2>/dev/null | awk '{print $2}')"
+    echo
+    echo "  Entrée : menu"
+}
+
+while true; do
+    if [ "$(cat "$RUN/etat" 2>/dev/null)" = a-configurer ] && [ -z "${DEJA:-}" ]; then
+        DEJA=1
+        whiptail --title "Auspex — premier démarrage" --yesno "Ce capteur n'est pas configuré. Le configurer maintenant ?\n\n(Sinon : support AUSPEX-CONF avec capteur.conf, puis redémarrage.)" 11 $W && configure
+    fi
+    status
+    if read -r -t 15 _; then
+        choice=$(whiptail --title "Auspex — capteur" --menu "" 15 $W 6 \
+            1 "Configurer" 2 "Clé d'envoi (à déclarer sur le central)" 3 "Exporter la clé sur clé USB" \
+            4 "Redémarrer" 5 "Éteindre" 6 "Retour" 3>&1 1>&2 2>&3) || continue
+        case "$choice" in
+            1) configure ;; 2) show_key ;; 3) export_key ;;
+            4) whiptail --yesno "Redémarrer le capteur ?" 7 $W && systemctl reboot ;;
+            5) whiptail --yesno "Éteindre le capteur ?" 7 $W && systemctl poweroff ;;
+        esac
+    fi
+done

@@ -1,0 +1,11 @@
+# Règles d'identification apportées par ce module.
+# Format identique à celui des règles du projet : voir CONTRIBUTING.md d'Auspex.
+# Chaque empreinte doit provenir d'une capture réelle, jamais de mémoire.
+
+rules:
+  - id: exemple-mqtt-broker          # préfixe unique propre au module
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: { one_of: [1883, 8883] } }
+    set: { role: "Broker MQTT (IoT)" }
+    weight: 0.6

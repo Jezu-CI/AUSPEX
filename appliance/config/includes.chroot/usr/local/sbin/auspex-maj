@@ -1,0 +1,144 @@
+#!/bin/bash
+# Mises à jour signées de l'analyse, récupérées auprès du central.
+#
+# Toutes les MAJ_FREQUENCE minutes (360 par défaut) : manifeste publié par le
+# central (même connexion SSH que l'envoi des logs, clé d'hôte épinglée, en
+# lecture seule), signature vérifiée avec MAJ_CLE. Version plus récente et
+# jamais abandonnée : image téléchargée dans l'emplacement libre (reprise
+# possible, base locale pour ne transférer que les différences), empreinte
+# vérifiée, bascule, essai de MAJ_ESSAI secondes (300 par défaut) : l'analyse
+# doit tourner sans redémarrer. Sinon retour automatique à la version
+# précédente, et la version est écartée.
+#
+# Sans MAJ_CLE dans capteur.conf : mises à jour désactivées (seule l'ISO compte).
+set -uo pipefail
+. /usr/local/lib/auspex/lib.sh
+. /usr/local/lib/auspex/maj.sh
+DL="$MAJ/telechargement"
+KEY="$DATA/cle/cle"
+STATUS="$DATA/logs/auspex-etat.json"
+
+if ! load_conf >/dev/null 2>&1; then
+    msg "mises à jour : capteur non configuré"; exit 0
+fi
+if [ -z "${C[MAJ_CLE]:-}" ]; then
+    msg "mises à jour désactivées (MAJ_CLE absente de capteur.conf)"; exit 0
+fi
+PEM="$RUN/maj.pem"
+maj_pem "${C[MAJ_CLE]}" "$PEM"
+FREQ=$(( 10#${C[MAJ_FREQUENCE]:-360} ))
+ESSAI=$(( 10#${C[MAJ_ESSAI]:-300} ))
+HOST=$(central_host); PORT=$(central_port)
+mkdir -p "$MAJ"
+
+statut() {   # statut ÉVÉNEMENT [DÉTAIL] : état lu par le central (auspex capteur liste)
+    local slot version
+    read -r slot version < "$RUN/analyse" 2>/dev/null || { slot=usine; version=$(usine_version); }
+    printf '{"nom":"%s","analyse":"%s","emplacement":"%s","systeme":"%s","maj":"%s","detail":"%s","date":"%s"}\n' \
+        "${C[NOM]}" "$version" "$slot" "$(usine_version)" "$1" "${2//\"/}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > "$STATUS.tmp" && chmod 644 "$STATUS.tmp" && mv -f "$STATUS.tmp" "$STATUS"
+}
+
+recuperer() {   # recuperer FICHIER… : depuis courant/ du central vers $DL
+    local known seen files=() f
+    known=$(mktemp)
+    ssh-keyscan -T 10 -t ed25519 -p "$PORT" "$HOST" > "$known" 2>/dev/null || true
+    seen=$(ssh-keygen -l -f "$known" 2>/dev/null | awk '{print $2}' | head -1)
+    if [ "$seen" != "${C[CENTRAL_EMPREINTE]}" ]; then
+        msg "mises à jour : central injoignable ou empreinte différente (${seen:-aucune réponse})"
+        rm -f "$known"; return 1
+    fi
+    for f in "$@"; do files+=("capteur@$HOST:courant/$f"); done
+    rsync -t --partial --timeout=120 \
+        -e "ssh -i $KEY -p $PORT -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known -o HostKeyAlgorithms=ssh-ed25519 -o ConnectTimeout=15 -o ServerAliveInterval=15 -o LogLevel=ERROR" \
+        "${files[@]}" "$DL/" 2>"$RUN/maj.err"
+    local rc=$?
+    rm -f "$known"
+    return $rc
+}
+
+basculer() {
+    systemctl stop auspex-capteur.service
+    /usr/local/sbin/auspex-racine
+    systemctl start auspex-capteur.service
+}
+
+essai() {   # l'analyse doit tourner ESSAI secondes sans redémarrer
+    local i
+    for (( i = 0; i < ESSAI; i += 5 )); do
+        sleep 5
+        if [ "$(systemctl show -p NRestarts --value auspex-capteur.service)" != 0 ]; then
+            ESSAI_RAISON="l'analyse redémarre en boucle"; return 1
+        fi
+    done
+    if [ "$(systemctl is-active auspex-capteur.service)" != active ]; then
+        ESSAI_RAISON="l'analyse ne tourne pas"; return 1
+    fi
+}
+
+verifier_une_fois() {
+    local current slot target v free
+    mkdir -p "$DL"
+    rm -f "$DL/manifeste" "$DL/manifeste.sig"
+    if ! recuperer manifeste manifeste.sig; then
+        grep -q "No such file\|change_dir" "$RUN/maj.err" 2>/dev/null || \
+            msg "mises à jour : manifeste non récupéré ($(tail -c 200 "$RUN/maj.err" 2>/dev/null | tr '\n' ' '))"
+        return 0
+    fi
+    if ! maj_verifier "$DL" "$PEM"; then
+        msg "mise à jour refusée : $MAJ_RAISON"
+        statut refusee "$MAJ_RAISON"
+        return 0
+    fi
+    v="${M[version]}"
+    read -r slot current < "$RUN/analyse" 2>/dev/null || { slot=usine; current=$(usine_version); }
+    etat_lire
+    if ! version_gt "$v" "$current"; then return 0; fi
+    if refusee "$v"; then return 0; fi
+
+    target=$(autre_slot "$slot")
+    free=$(( $(stat -f -c '%a*%S' "$MAJ" ) ))
+    if (( free < M[taille] * 11 / 10 + 50 * 1024 * 1024 )); then
+        msg "mise à jour $v : place insuffisante sur le disque de données"; statut erreur "place insuffisante"; return 0
+    fi
+    # Base locale : seules les différences avec l'image active transitent.
+    if [ ! -f "$DL/image.squashfs" ] && [ "$slot" != usine ] && [ -f "$MAJ/$slot/image.squashfs" ]; then
+        cp "$MAJ/$slot/image.squashfs" "$DL/image.squashfs"
+    fi
+    msg "mise à jour $v disponible : téléchargement"
+    if ! recuperer image.squashfs manifeste manifeste.sig; then
+        msg "mise à jour $v : téléchargement interrompu (reprise au prochain passage)"; return 0
+    fi
+    if ! maj_verifier "$DL" "$PEM" image; then
+        msg "mise à jour $v refusée : $MAJ_RAISON"
+        rm -f "$DL/image.squashfs"; statut refusee "$MAJ_RAISON"; return 0
+    fi
+    [ "${M[version]}" = "$v" ] || return 0          # publication changée entre-temps : prochain passage
+
+    rm -rf "${MAJ:?}/$target"
+    mv "$DL" "$MAJ/$target"
+    sync -f "$MAJ/$target/image.squashfs" 2>/dev/null || true
+    E[precedent]="$slot"; E[actif]="$target"; E[essai]=1
+    etat_ecrire
+    msg "mise à jour $v installée (emplacement $target) : essai de $ESSAI s"
+    basculer
+    if essai; then
+        E[essai]=0; etat_ecrire
+        msg "mise à jour $v validée"
+        statut validee "$v"
+    else
+        refuser "$v"
+        E[actif]="$slot"; E[essai]=0; etat_ecrire
+        msg "mise à jour $v en échec ($ESSAI_RAISON) : retour à $current"
+        basculer
+        statut echec "$v : $ESSAI_RAISON"
+    fi
+}
+
+statut demarrage ""
+sleep 60
+while true; do
+    [ -f "$STATUS" ] || statut a_jour ""      # la rétention du capteur l'a effacé
+    verifier_une_fois
+    sleep $(( FREQ * 60 ))
+done

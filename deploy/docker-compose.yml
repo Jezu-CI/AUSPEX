@@ -1,0 +1,180 @@
+# Central Auspex : NetBox + PostgreSQL + Redis + Auspex.
+#
+# Installation : ./install.sh     Mise à jour : ./update.sh
+# Les secrets sont dans .env (créé par install.sh, droits 600, jamais dans Git).
+
+name: auspex
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?définir DB_PASSWORD dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbox -d netbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    # Valkey (licence BSD, fondation Linux), compatible Redis : Redis 7.4 et suivants
+    # ne sont plus sous licence libre. Nom de service inchangé (NetBox l'attend).
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]  # cache uniquement
+    restart: unless-stopped
+
+  netbox:
+    # NetBox officiel + plugin Auspex (restriction des connexions par IP source)
+    build:
+      context: ..
+      dockerfile: deploy/netbox/Dockerfile
+      args:
+        NETBOX_VERSION: ${NETBOX_VERSION:-v4.4}
+    image: auspex-netbox:${NETBOX_VERSION:-v4.4}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DB_HOST: postgres
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_CACHE_HOST: redis
+      SECRET_KEY: ${NETBOX_SECRET_KEY:?définir NETBOX_SECRET_KEY dans .env}
+      SUPERUSER_NAME: admin
+      SUPERUSER_EMAIL: ${NETBOX_ADMIN_EMAIL:-admin@example.invalid}
+      SUPERUSER_PASSWORD: ${NETBOX_ADMIN_PASSWORD:?définir NETBOX_ADMIN_PASSWORD dans .env}
+      SKIP_SUPERUSER: "false"
+      # Jeton imposé : sans lui, l'image crée un jeton administrateur connu publiquement.
+      SUPERUSER_API_TOKEN: ${NETBOX_ADMIN_TOKEN:?définir NETBOX_ADMIN_TOKEN dans .env}
+      AUSPEX_INTERNAL_SUBNET: ${AUSPEX_INTERNAL_SUBNET:-172.31.250.0/24}
+      # Mot de passe SMTP des codes MFA par e-mail (facultatif, dans .env)
+      AUSPEX_SMTP_PASSWORD: ${AUSPEX_SMTP_PASSWORD:-}
+      # Mot de passe du compte de lecture de l'annuaire (LDAPS), dans .env
+      AUSPEX_LDAP_BIND_PASSWORD: ${AUSPEX_LDAP_BIND_PASSWORD:-}
+      # Secret du client OIDC (Entra ID, Google, Keycloak...), dans .env
+      AUSPEX_OIDC_CLIENT_SECRET: ${AUSPEX_OIDC_CLIENT_SECRET:-}
+      # Front HTTPS : son adresse (proxy de confiance) et le secret qui prouve
+      # qu'une connexion par carte vient bien de lui.
+      AUSPEX_FRONT_IP: ${AUSPEX_FRONT_IP:-172.31.250.250}
+      AUSPEX_PROXY_SECRET: ${AUSPEX_PROXY_SECRET:?définir AUSPEX_PROXY_SECRET dans .env}
+    # Par défaut, NetBox n'écoute que sur la machine locale : le publier
+    # derrière un reverse proxy TLS (NETBOX_BIND=0.0.0.0 à vos risques).
+    ports:
+      - "${NETBOX_BIND:-127.0.0.1}:${NETBOX_PORT:-8080}:8080"
+    volumes:
+      - netbox-media:/opt/netbox/netbox/media
+      - ./config:/etc/auspex:ro       # section « access » de auspex.yaml
+      # Instantané du tableau de bord écrit par Auspex : seul répertoire de
+      # données qu'il partage avec NetBox, en lecture seule.
+      - ./data/state/tableau:/var/lib/auspex-tableau:ro
+    restart: unless-stopped
+
+  auspex:
+    build:
+      context: ..
+      dockerfile: deploy/central/Dockerfile
+    image: auspex-central:${AUSPEX_VERSION:-local}
+    depends_on:
+      - netbox
+    user: "${AUSPEX_UID:-10001}:${AUSPEX_GID:-10001}"
+    environment:
+      # Seul le jeton du compte de service Librarian (droits restreints) est
+      # transmis à Auspex ; le jeton administrateur reste dans .env.
+      NETBOX_TOKEN: ${LIBRARIAN_TOKEN:?définir LIBRARIAN_TOKEN dans .env}
+      AUSPEX_INTERVAL: ${AUSPEX_INTERVAL:-300}
+    volumes:
+      - ./config:/etc/auspex
+      - ./data:/var/lib/auspex
+      - ${AUSPEX_LOGS_DIR:-./logs}:/var/lib/auspex/logs:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  acces:
+    # Front HTTPS devant NetBox (certificat et clé dans tls/, hors de config/ :
+    # NetBox, qui lit config/, ne voit jamais la clé privée), et port de
+    # connexion par carte à puce quand auth.carte est configurée.
+    build:
+      context: ..
+      dockerfile: deploy/acces/Dockerfile
+    image: auspex-acces:${AUSPEX_VERSION:-local}
+    depends_on:
+      - netbox
+    user: "${AUSPEX_UID:-10001}:${AUSPEX_GID:-10001}"
+    environment:
+      AUSPEX_PROXY_SECRET: ${AUSPEX_PROXY_SECRET:?définir AUSPEX_PROXY_SECRET dans .env}
+      AUSPEX_HTTPS_PORT: ${AUSPEX_HTTPS_PORT:-443}
+    ports:
+      - "${AUSPEX_HTTPS_BIND:-0.0.0.0}:${AUSPEX_HTTPS_PORT:-443}:8443"
+      - "${AUSPEX_HTTPS_BIND:-0.0.0.0}:${AUSPEX_CARTE_PORT:-8443}:9443"
+    volumes:
+      - ./tls:/etc/auspex-front:ro                  # certificat et clé HTTPS
+      - ./config/tls:/etc/auspex/tls:ro             # autorités et LCR des cartes (publiques)
+      - ./data/state/acces:/etc/auspex-acces:ro     # bloc carte écrit par Auspex
+    networks:
+      default:
+        ipv4_address: ${AUSPEX_FRONT_IP:-172.31.250.250}
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  reception:
+    # Réception des logs des capteurs : SSH + rsync en écriture seule, un dossier
+    # par capteur ; mises à jour signées en lecture seule. Seuls les capteurs déclarés avec une clé (sensors[].key) entrent.
+    build:
+      context: ..
+      dockerfile: deploy/reception/Dockerfile
+      args:
+        UID: ${AUSPEX_UID:-10001}
+        GID: ${AUSPEX_GID:-10001}
+    image: auspex-reception:${AUSPEX_VERSION:-local}
+    user: "${AUSPEX_UID:-10001}:${AUSPEX_GID:-10001}"
+    ports:
+      - "${AUSPEX_SENSOR_BIND:-0.0.0.0}:${AUSPEX_SENSOR_PORT:-2222}:2222"
+    environment:
+      AUSPEX_LOGS_RETENTION_DAYS: ${AUSPEX_LOGS_RETENTION_DAYS:-30}
+    volumes:
+      - ${AUSPEX_LOGS_DIR:-./logs}:/logs
+      - ./data/reception:/var/lib/reception                 # clé d'hôte
+      - ./data/state/reception:/etc/auspex-reception:ro     # clés autorisées (écrites par Auspex)
+      - ./data/mises-a-jour:/mises-a-jour:ro                # mises à jour signées (lecture seule)
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  netbox-media:
+
+# Réseau interne à plage fixe : Librarian n'est accepté que depuis ce réseau,
+# et sa première adresse (passerelle) est la machine du central elle-même.
+# À changer dans .env si la plage entre en conflit avec un réseau du site.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${AUSPEX_INTERNAL_SUBNET:-172.31.250.0/24}

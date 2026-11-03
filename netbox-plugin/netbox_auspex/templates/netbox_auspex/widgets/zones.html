@@ -1,0 +1,23 @@
+{% include "netbox_auspex/widgets/_freshness.html" %}
+{% if snapshot %}
+{% if names %}
+<div class="table-responsive">
+<table class="table table-sm table-bordered text-center mb-1 small" id="auspex-zone-matrix">
+  <thead><tr><th class="text-start text-muted fw-normal">de ↓ vers →</th>{% for n in names %}<th class="fw-normal text-nowrap" title="{{ n }}">{{ n|truncatechars:9 }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for src, row in grid %}
+    <tr><th class="text-start fw-normal">{{ src }}</th>
+    {% for cell in row %}
+      {% if cell == "self" %}<td class="bg-secondary-lt"></td>
+      {% elif cell %}<td class="{% if cell.findings %}bg-red-lt{% endif %}" title="{{ cell.flows }} flux, {{ cell.findings }} écart(s)">{{ cell.flows }}{% if cell.findings %} <span class="badge text-bg-red">{{ cell.findings }}</span>{% endif %}</td>
+      {% else %}<td class="text-muted">·</td>{% endif %}
+    {% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<small class="text-muted">Nombre de flux observés ; en rouge : écarts ouverts entre ces zones.</small>
+{% else %}
+<p class="text-muted mb-0">Aucun flux entre zones observé.</p>
+{% endif %}
+{% endif %}

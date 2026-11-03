@@ -1,0 +1,24 @@
+{% include "netbox_auspex/widgets/_freshness.html" %}
+{% if snapshot %}
+<div class="d-flex flex-wrap gap-1 mb-2" id="auspex-severity-counters">
+  {% for label, color, n, key in counters %}
+    <a class="badge text-bg-{% if n %}{{ color }}{% else %}secondary{% endif %} text-decoration-none" href="{% url 'plugins:netbox_auspex:findings' %}?gravite={{ key }}">{{ label }} : {{ n }}</a>
+  {% endfor %}
+</div>
+{% if items %}
+<table class="table table-sm table-hover mb-1">
+  <tbody>
+  {% for f in items %}
+    <tr>
+      <td class="text-nowrap"><span class="badge text-bg-{{ f.severity_color }}">{{ f.severity_label }}</span></td>
+      <td><div>{{ f.title }}</div><small class="text-muted">{{ f.path|default:f.message }}{% if f.port_label %} · {{ f.port_label }}{% endif %}</small></td>
+      <td class="text-nowrap text-muted small">{{ f.opened_at|slice:":10" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-muted mb-1">Aucun écart ouvert pour ce filtre.</p>
+{% endif %}
+<a class="small" href="{% url 'plugins:netbox_auspex:findings' %}">Tous les écarts{% if more %} ({{ more }} de plus){% endif %} →</a>
+{% endif %}

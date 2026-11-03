@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Signaler une vulnérabilité (privé)
+    url: https://github.com/Jezu-CI/AUSPEX/security/advisories/new
+    about: Ne jamais ouvrir d'issue publique pour une faille. Voir SECURITY.md.
+  - name: Documentation
+    url: https://jezu-ci.github.io/AUSPEX/
+    about: Guide d'installation, documentation technique, captures d'écran.

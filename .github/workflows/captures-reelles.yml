@@ -1,0 +1,62 @@
+name: Captures réelles
+
+# Captures industrielles publiques rejouées dans le vrai capteur (Zeek + ICSNPP),
+# puis identification par Auspex comparée aux attendus (jalon J2–J3).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rules/**"
+      - "sensor/**"
+      - "src/auspex/fingerprint/**"
+      - "src/auspex/zeek.py"
+      - "tools/captures*"
+      - ".github/workflows/captures-reelles.yml"
+  pull_request:
+    paths:
+      - "rules/**"
+      - "sensor/**"
+      - "src/auspex/fingerprint/**"
+      - "tools/captures*"
+  schedule:
+    - cron: "17 3 * * 1"        # chaque lundi : le dépôt source et les parsers évoluent
+  workflow_dispatch:
+
+concurrency:
+  group: captures-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  captures:
+    name: Captures industrielles publiques (vrai Zeek)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -q -e .
+      - name: Image du capteur
+        run: |
+          docker build -q -t auspex-sensor:ci sensor >/dev/null
+          docker run --rm auspex-sensor:ci version
+      - name: Téléchargement des captures (épinglées, SHA-256 vérifiés)
+        run: |
+          git lfs version
+          python tools/captures_reelles.py telecharger corpus
+      - name: Le capteur lit chaque capture (réseau coupé, lecture seule)
+        run: python tools/captures_reelles.py zeek corpus auspex-sensor:ci
+      - name: Indices observés et identifications attendues
+        run: |
+          set -o pipefail
+          python tools/captures_reelles.py rapport corpus | tee rapport.txt
+      - name: Rapport
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: captures-reelles-rapport
+          path: rapport.txt
+          retention-days: 30

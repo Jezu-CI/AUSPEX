@@ -1,0 +1,430 @@
+# Règles d'identification passive — environnements industriels (OT)
+#
+# Les rôles maître / esclave se déduisent du sens des connexions : l'automate
+# répond, la supervision ou la station d'ingénierie interroge.
+#
+# Les règles « cip-identity » et « s7-service » s'appuient sur les parsers
+# ICSNPP (CISA/INL). Leurs noms de champs sont vérifiés à chaque passage de la
+# CI, sur le vrai Zeek (tests/integration).
+
+rules:
+  # --- Répondeurs industriels (l'équipement de terrain) ---
+  - id: ot-modbus-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 502 }
+    set: { role: "Esclave Modbus (automate, passerelle ou RTU)", device_type: "Équipement industriel" }
+    weight: 0.6
+
+  - id: ot-s7-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 102 }
+    set: { role: "Automate (ISO-TSAP, S7 probable)", device_type: Automate }
+    weight: 0.5
+    description: Le port 102 sert à S7comm mais aussi à d'autres usages ISO-TSAP
+
+  - id: ot-s7-service
+    log: conn
+    target: resp
+    match: { id.resp_p: 102, service: { regex: "s7comm" } }
+    set: { vendor: Siemens, device_type: Automate }
+    weight: 0.7
+    description: Confirmé par le parser S7comm d'ICSNPP
+
+  - id: ot-enip-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 44818 }
+    set: { role: "Équipement EtherNet/IP", device_type: "Équipement industriel" }
+    weight: 0.5
+
+  - id: ot-dnp3-outstation
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 20000 }
+    set: { role: "Station DNP3 (outstation)", device_type: "Équipement industriel" }
+    weight: 0.6
+
+  # Réponse exigée : une diffusion Who-Is (x.x.255.255) passait pour un équipement (relevé).
+  - id: ot-bacnet-device
+    log: conn
+    target: resp
+    match: { proto: udp, id.resp_p: 47808, resp_bytes: { min: 1 } }
+    set: { role: "Équipement BACnet", device_type: "Gestion technique du bâtiment" }
+    weight: 0.6
+
+  - id: ot-opcua-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 4840 }
+    set: { role: "Serveur OPC UA" }
+    weight: 0.6
+
+  # --- Initiateurs industriels (supervision, IHM, ingénierie) ---
+  # Échange applicatif exigé dans les deux sens : sur des captures réelles (4SICS),
+  # une simple connexion de balayage faisait passer le scanner pour un maître.
+  - id: ot-modbus-master
+    log: conn
+    target: orig
+    match: { proto: tcp, id.resp_p: 502, orig_bytes: { min: 1 }, resp_bytes: { min: 1 } }
+    set: { role: "Maître Modbus (SCADA ou IHM probable)" }
+    weight: 0.5
+
+  - id: ot-s7-client
+    log: conn
+    target: orig
+    match: { proto: tcp, id.resp_p: 102, orig_bytes: { min: 1 }, resp_bytes: { min: 1 } }
+    set: { role: "Client S7 (IHM ou station d'ingénierie probable)" }
+    weight: 0.4
+
+  - id: ot-dnp3-master
+    log: conn
+    target: orig
+    match: { proto: tcp, id.resp_p: 20000, orig_bytes: { min: 1 }, resp_bytes: { min: 1 } }
+    set: { role: "Maître DNP3 (SCADA probable)" }
+    weight: 0.5
+
+  # --- Identité déclarée par l'équipement (ICSNPP EtherNet/IP) ---
+  - id: ot-cip-identity
+    log: cip_identity
+    target: socket_address
+    match: { product_name: { exists: true } }
+    set:
+      vendor: "{vendor_name}"
+      model: "{product_name}"
+      firmware: "{revision}"
+      device_type: "{device_type_name}"
+    weight: 0.9
+    require_established: false
+    description: L'équipement annonce lui-même fabricant, modèle et révision
+
+  # --- Protocoles confirmés par les analyseurs de Zeek (modbus.log, dnp3.log) ---
+  - id: ot-modbus-confirmed-server
+    log: modbus
+    target: resp
+    match: { func: { exists: true } }
+    set: { role: "Esclave Modbus (automate, passerelle ou RTU)", device_type: "Équipement industriel" }
+    weight: 0.8
+    require_established: false
+
+  - id: ot-modbus-confirmed-master
+    log: modbus
+    target: orig
+    match: { func: { exists: true } }
+    set: { role: "Maître Modbus (SCADA ou IHM probable)" }
+    weight: 0.7
+    require_established: false
+
+  - id: ot-dnp3-confirmed-outstation
+    log: dnp3
+    target: resp
+    match: { fc_reply: { exists: true } }
+    set: { role: "Station DNP3 (outstation)", device_type: "Équipement industriel" }
+    weight: 0.8
+    require_established: false
+
+  - id: ot-dnp3-confirmed-master
+    log: dnp3
+    target: orig
+    match: { fc_request: { exists: true } }
+    set: { role: "Maître DNP3 (SCADA probable)" }
+    weight: 0.7
+    require_established: false
+
+  # --- Autres protocoles industriels (port seulement : indices prudents) ---
+  - id: ot-iec104-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 2404 }
+    set: { role: "Station IEC 60870-5-104 (RTU, poste électrique)", device_type: "Équipement industriel" }
+    weight: 0.6
+
+  - id: ot-iec104-master
+    log: conn
+    target: orig
+    match: { proto: tcp, id.resp_p: 2404, orig_bytes: { min: 1 }, resp_bytes: { min: 1 } }
+    set: { role: "Maître IEC 60870-5-104 (SCADA probable)" }
+    weight: 0.5
+
+  - id: ot-niagara-fox
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: { one_of: [1911, 4911] } }
+    set: { role: "Superviseur Niagara (Fox)", vendor: Tridium, device_type: "Gestion technique du bâtiment" }
+    weight: 0.6
+
+  - id: ot-omron-fins
+    log: conn
+    target: resp
+    match: { id.resp_p: 9600 }
+    set: { role: "Automate Omron (FINS)", vendor: Omron, device_type: Automate }
+    weight: 0.5
+
+  - id: ot-ge-srtp
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 18245 }
+    set: { role: "Automate GE (SRTP)", device_type: Automate }
+    weight: 0.5
+
+  - id: ot-pcworx
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 1962 }
+    set: { role: "Automate Phoenix Contact (PC WORX)", vendor: "Phoenix Contact", device_type: Automate }
+    weight: 0.5
+
+  - id: ot-proconos
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 20547 }
+    set: { role: "Automate ProConOS (KW-Software)", device_type: Automate }
+    weight: 0.5
+
+  - id: ot-codesys
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: { one_of: [1200, 2455] } }
+    set: { role: "Automate CODESYS (runtime)", device_type: Automate }
+    weight: 0.4
+
+  - id: ot-redlion-crimson
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 789 }
+    set: { role: "IHM Red Lion (Crimson)", vendor: "Red Lion", device_type: IHM }
+    weight: 0.5
+
+  - id: ot-hart-ip
+    log: conn
+    target: resp
+    match: { id.resp_p: 5094 }
+    set: { role: "Passerelle HART-IP", device_type: "Équipement industriel" }
+    weight: 0.5
+
+  - id: ot-enip-io
+    log: conn
+    target: resp
+    match: { proto: udp, id.resp_p: 2222 }
+    set: { role: "Équipement EtherNet/IP (échanges d'E/S)", device_type: "Équipement industriel" }
+    weight: 0.4
+
+  # --- Certificats présentés par les équipements (ssl.log, subject) ---
+  # Relevés sur captures réelles (4SICS 2015) : certificats par défaut des constructeurs.
+  - id: ot-cert-moxa
+    log: ssl
+    target: resp
+    match: { subject: { regex: "O=Moxa" } }
+    set: { vendor: Moxa, device_type: "Équipement réseau industriel" }
+    weight: 0.8
+    require_established: false
+
+  - id: ot-cert-hirschmann
+    log: ssl
+    target: resp
+    match: { subject: { regex: "O=Hirschmann" } }
+    set: { vendor: "Hirschmann (Belden)", device_type: "Équipement réseau industriel" }
+    weight: 0.8
+    require_established: false
+
+  - id: ot-cert-hirschmann-eagle
+    log: ssl
+    target: resp
+    match: { subject: { regex: "CN=(Eagle[\\w-]*)" } }
+    set: { model: "{1}", device_type: "Pare-feu industriel" }
+    weight: 0.7
+    require_established: false
+    description: Gamme EAGLE (pare-feu / routeur VPN industriel)
+
+  - id: ot-cert-ruggedcom
+    log: ssl
+    target: resp
+    match: { subject: { regex: "O=Ruggedcom" } }
+    set: { vendor: "Siemens (RUGGEDCOM)", device_type: "Équipement réseau industriel" }
+    weight: 0.8
+    require_established: false
+
+  - id: ot-cert-digi
+    log: ssl
+    target: resp
+    match: { subject: { regex: "O=Digi International" } }
+    set: { vendor: "Digi International" }
+    weight: 0.8
+    require_established: false
+
+  - id: ot-cert-digi-cm
+    log: ssl
+    target: resp
+    match: { subject: { regex: "CN=Digi CM" } }
+    set: { model: "Digi CM", device_type: "Serveur de console" }
+    weight: 0.7
+    require_established: false
+
+  - id: ot-cert-siemens
+    log: ssl
+    target: resp
+    match: { subject: { regex: "O=Siemens" } }
+    set: { vendor: Siemens }
+    weight: 0.6
+    require_established: false
+
+  - id: ot-cert-schneider
+    log: ssl
+    target: resp
+    match: { subject: { regex: "O=Schneider Electric" } }
+    set: { vendor: "Schneider Electric" }
+    weight: 0.6
+    require_established: false
+
+  # --- SNMP : sysDescr des automates (relevé : S7-1200 de 4SICS 2015) ---
+  - id: ot-snmp-simatic
+    log: snmp
+    target: resp
+    match: { display_string: { regex: "SIMATIC S7, (CPU[- ]?\\w+), (6ES7 ?\\d{3}-\\w{5}-\\w{4})" } }
+    set: { vendor: Siemens, model: "SIMATIC S7 {1} ({2})", device_type: Automate }
+    weight: 0.9
+    require_established: false
+
+  - id: ot-snmp-simatic-firmware
+    log: snmp
+    target: resp
+    match: { display_string: { regex: "SIMATIC.*, V\\.?\\s?(\\d+\\.\\d+(?:\\.\\d+)?)" } }
+    set: { firmware: "V{1}" }
+    weight: 0.8
+    require_established: false
+
+  # --- Champs relevés sur le vrai Zeek (9.x) + ICSNPP, captures publiques ---
+  # S7comm classique : l'automate répond, le client lit/écrit des variables (IHM)
+  # ou manipule les blocs et la CPU (station d'ingénierie).
+  - id: ot-s7comm-plc
+    log: s7comm
+    target: resp
+    match: { rosctr_name: { exists: true } }
+    set: { vendor: Siemens, device_type: Automate, role: "Automate Siemens (S7comm)" }
+    weight: 0.85
+    require_established: false
+
+  - id: ot-s7comm-hmi
+    log: s7comm
+    target: orig
+    match: { function_name: { one_of: ["Read Variable", "Write Variable"] } }
+    set: { role: "IHM ou supervision (variables S7)" }
+    weight: 0.6
+    require_established: false
+
+  - id: ot-s7comm-engineering
+    log: s7comm
+    target: orig
+    match: { function_name: { regex: "Block Functions|Download|Upload|PLC Control|PLC Stop" } }
+    set: { role: "Station d'ingénierie (programmation S7)" }
+    weight: 0.8
+    require_established: false
+    description: Liste ou transfert de blocs, démarrage / arrêt de la CPU
+
+  # S7comm-plus : S7-1200 (V4+) et S7-1500
+  - id: ot-s7commplus-plc
+    log: s7comm_plus
+    target: resp
+    match: { opcode_name: { exists: true } }
+    set: { vendor: Siemens, device_type: Automate, role: "Automate Siemens S7-1200 / S7-1500 (S7comm-plus)" }
+    weight: 0.85
+    require_established: false
+
+  - id: ot-s7commplus-client
+    log: s7comm_plus
+    target: orig
+    match: { opcode_name: { exists: true } }
+    set: { role: "Client S7comm-plus (TIA Portal ou IHM)" }
+    weight: 0.7
+    require_established: false
+
+  # Modbus : fonctions de programmation (Concept / Unity) = station d'ingénierie
+  - id: ot-modbus-engineering
+    log: modbus
+    target: orig
+    match: { func: { regex: "^PROGRAM_|FIRMWARE_REPLACEMENT" } }
+    set: { role: "Station d'ingénierie (programmation Modbus)" }
+    weight: 0.8
+    require_established: false
+
+  - id: ot-modbus-modicon
+    log: modbus
+    target: resp
+    match: { func: { regex: "^PROGRAM_CONCEPT$" } }
+    set: { vendor: "Schneider Electric (Modicon)", device_type: Automate }
+    weight: 0.5
+    require_established: false
+    description: Fonction de programmation propre au logiciel Concept (Modicon)
+
+  # BACnet : l'équipement annonce son fabricant (I-Am) et répond sur ses propriétés
+  - id: ot-bacnet-i-am
+    log: bacnet_discovery
+    target: source_h
+    match: { pdu_service: { regex: "i.am" }, vendor: { exists: true } }
+    set: { vendor: "{vendor}", role: "Équipement BACnet", device_type: "Gestion technique du bâtiment" }
+    weight: 0.85
+    require_established: false
+
+  # Une même adresse qui annonce plusieurs équipements (instances) est un routeur
+  # BACnet/IP ↔ MS/TP ou une passerelle : les I-Am des équipements situés derrière
+  # portent son adresse IP (relevé : Tridium et Watt Stopper annoncés par la même IP).
+  - id: ot-bacnet-router
+    log: bacnet_discovery
+    target: source_h
+    match: { pdu_service: { regex: "i.am" }, instance_number: { exists: true } }
+    count_distinct: [instance_number]
+    min_count: 2
+    set: { role: "Routeur ou passerelle BACnet (plusieurs équipements derrière cette adresse)" }
+    weight: 0.8
+    require_established: false
+
+  - id: ot-bacnet-model-name
+    log: bacnet_property
+    target: source_h
+    match: { property: model-name, value: { exists: true } }
+    set: { model: "{value}" }
+    weight: 0.85
+    require_established: false
+
+  - id: ot-bacnet-firmware
+    log: bacnet_property
+    target: source_h
+    match: { property: firmware-revision, value: { exists: true } }
+    set: { firmware: "{value}" }
+    weight: 0.85
+    require_established: false
+
+  - id: ot-bacnet-vendor-name
+    log: bacnet_property
+    target: source_h
+    match: { property: vendor-name, value: { exists: true } }
+    set: { vendor: "{value}" }
+    weight: 0.85
+    require_established: false
+
+  # Omron FINS : l'automate renvoie son modèle et sa version (Controller Data Read)
+  - id: ot-fins-controller
+    log: omron_fins_detail
+    target: resp
+    match: { controller_model: { regex: "\\w" } }
+    set: { vendor: Omron, model: "{controller_model}", firmware: "{controller_version}", device_type: Automate }
+    weight: 0.85
+    require_established: false
+
+  - id: ot-fins-engineering
+    log: omron_fins_general
+    target: orig
+    match: { command_code: { regex: "^(Run|Stop|Program Area Write|File|Memory Card|Single File Write)" } }
+    set: { role: "Station d'ingénierie (programmation Omron)" }
+    weight: 0.8
+    require_established: false
+
+  # HART-IP : la passerelle donne son type d'équipement (commande 0)
+  - id: ot-hart-identity
+    log: hart_ip_universal_commands
+    target: resp
+    match: { id.resp_p: 5094, read_unique_identifier_response_expanded_device_type: { exists: true } }
+    set: { model: "{read_unique_identifier_response_expanded_device_type}", role: "Passerelle HART-IP" }
+    weight: 0.8
+    require_established: false

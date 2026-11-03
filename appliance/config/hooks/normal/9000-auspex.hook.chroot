@@ -1,0 +1,31 @@
+#!/bin/sh
+# Durcissement de l'image du capteur Auspex.
+set -e
+
+# Aucune configuration réseau automatique (live-boot + ifupdown lançaient dhclient
+# sur TOUTES les interfaces, écoute comprise) : seul systemd-networkd, piloté par
+# auspex-reseau, configure le réseau.
+apt-get purge -y ifupdown isc-dhcp-client isc-dhcp-common 2>/dev/null || true
+rm -f /etc/network/interfaces /etc/network/interfaces.d/*
+systemctl mask networking.service ifup@.service 2>/dev/null || true
+
+# Services du capteur ; aucune connexion locale ni distante.
+systemctl enable systemd-networkd nftables chrony \
+    auspex-silence auspex-donnees auspex-config auspex-parefeu auspex-reseau auspex-racine auspex-capteur auspex-maj auspex-console
+systemctl mask systemd-networkd-wait-online.service apt-daily.timer apt-daily-upgrade.timer getty@tty1.service serial-getty@ttyS0.service \
+    getty-static.service getty@tty2.service getty@tty3.service getty@tty4.service getty@tty5.service getty@tty6.service \
+    autovt@.service
+passwd -l root
+usermod -s /usr/sbin/nologin root
+
+# Aucun serveur de temps par défaut : ceux de capteur.conf uniquement.
+sed -i 's/^\(pool\|server\) /#&/' /etc/chrony/chrony.conf
+mkdir -p /etc/chrony/conf.d
+grep -q '^confdir /etc/chrony/conf.d' /etc/chrony/chrony.conf || echo 'confdir /etc/chrony/conf.d' >> /etc/chrony/chrony.conf
+
+# Rien à mettre à jour depuis le capteur : pas de dépôts, pas de cache apt.
+rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*
+apt-get clean
+rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin
+
+chmod 755 /usr/local/sbin/auspex-* /usr/local/lib/auspex

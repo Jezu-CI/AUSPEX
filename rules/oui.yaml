@@ -1,0 +1,19 @@
+# Préfixes MAC (OUI) → fabricant.
+#
+# Échantillon de démarrage. La base IEEE complète est volumineuse et évolue :
+# elle sera fournie par un module de mise à jour des règles (canal « règles »).
+# Les préfixes de virtualisation sont utiles pour repérer les machines virtuelles.
+
+oui:
+  "00:50:56": { vendor: VMware, device_type: "Machine virtuelle", weight: 0.7 }
+  "00:0C:29": { vendor: VMware, device_type: "Machine virtuelle", weight: 0.7 }
+  "00:15:5D": { vendor: "Microsoft (Hyper-V)", device_type: "Machine virtuelle", weight: 0.7 }
+  "08:00:27": { vendor: "Oracle (VirtualBox)", device_type: "Machine virtuelle", weight: 0.7 }
+  "52:54:00": { vendor: "QEMU/KVM", device_type: "Machine virtuelle", weight: 0.6 }
+  "00:1B:1B": { vendor: Siemens, weight: 0.5 }
+  "00:0E:8C": { vendor: Siemens, weight: 0.5 }
+  "00:00:BC": { vendor: "Rockwell Automation", weight: 0.5 }
+  "00:1D:9C": { vendor: "Rockwell Automation", weight: 0.5 }
+  "00:80:F4": { vendor: "Schneider Electric", weight: 0.5 }
+  "B8:27:EB": { vendor: "Raspberry Pi", device_type: "Nano-ordinateur", weight: 0.6 }
+  "DC:A6:32": { vendor: "Raspberry Pi", device_type: "Nano-ordinateur", weight: 0.6 }

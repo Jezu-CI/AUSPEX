@@ -1,0 +1,13 @@
+[Unit]
+Description=Auspex : configuration et clé du capteur
+Requires=auspex-donnees.service
+After=auspex-donnees.service
+Before=auspex-parefeu.service auspex-reseau.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/auspex-config
+
+[Install]
+WantedBy=multi-user.target

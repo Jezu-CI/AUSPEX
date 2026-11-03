@@ -1,0 +1,554 @@
+name: CI
+
+# Économie de minutes (dépôt privé : quota mensuel) :
+# - documentation seule : aucune exécution ;
+# - une nouvelle poussée annule l'exécution en cours sur la même branche ;
+# - tests sur les versions extrêmes de Python à chaque poussée, les quatre chaque
+#   mois et à la demande ;
+# - preuves lourdes (central complet, appliance en VM, NetBox réel, capteur) seulement
+#   quand les fichiers qu'elles prouvent ont changé, chaque mois et à la demande.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**.md", "LICENSE"]
+  pull_request:
+    paths-ignore: ["docs/**", "**.md", "LICENSE"]
+  schedule:
+    - cron: "41 2 1 * *"          # le 1er de chaque mois : tout (preuves lourdes comprises)
+  workflow_dispatch:
+    inputs:
+      tout:
+        description: "Lancer toutes les preuves, quels que soient les fichiers modifiés"
+        type: boolean
+        default: true
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Fichiers modifiés
+    runs-on: ubuntu-24.04
+    outputs:
+      complet: ${{ steps.f.outputs.complet }}
+      central: ${{ steps.f.outputs.central }}
+      appliance: ${{ steps.f.outputs.appliance }}
+      capteur: ${{ steps.f.outputs.capteur }}
+      netbox: ${{ steps.f.outputs.netbox }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: f
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ]; then
+            for k in complet central appliance capteur netbox; do echo "$k=true" >> "$GITHUB_OUTPUT"; done
+            exit 0
+          fi
+          from="${BASE:-$BEFORE}"
+          if [ -z "$from" ] || ! git cat-file -e "$from^{commit}" 2>/dev/null; then from=HEAD~1; fi
+          files=$(git diff --name-only "$from" HEAD)
+          echo "$files" | sed 's/^/  /'
+          has() { echo "$files" | grep -Eq "$1" && echo true || echo false; }
+          {
+            echo "complet=false"
+            echo "central=$(has '^(src/|netbox-plugin/|deploy/|tools/ci_|tools/pcapgen|sensor/|pyproject|\.github/workflows/ci)')"
+            echo "appliance=$(has '^(appliance/|sensor/|deploy/reception/|deploy/docker-compose|src/auspex/(maj|reception|zeek|cli)\.py|tools/(ci_appliance|appliance-rootfs|pcapgen)|\.github/workflows/ci)')"
+            echo "capteur=$(has '^(sensor/|tools/pcapgen|tests/integration/|rules/|\.github/workflows/ci)')"
+            echo "netbox=$(has '^(src/auspex/netbox|tests/integration/|\.github/workflows/ci)')"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  tests:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    needs: changes
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ${{ needs.changes.outputs.complet == 'true' && fromJSON('["3.10", "3.11", "3.12", "3.13"]') || fromJSON('["3.10", "3.13"]') }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Installation
+        run: pip install -e ".[dev]"
+      - name: Tests unitaires et de bout en bout
+        shell: bash
+        run: |
+          set -o pipefail
+          # Chaque test en échec devient une annotation, lisible dans le rapport de la CI
+          pytest -q -rfE --tb=line 2>&1 | tee pytest.log || {
+            grep -E "^(FAILED|ERROR) |^/.*:[0-9]+: " pytest.log | head -40 | sed 's/^/::error title=pytest::/'
+            exit 1
+          }
+
+  demo:
+    name: Scénario de démonstration
+    runs-on: ubuntu-24.04
+    needs: tests
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Rejouer le scénario IT/OT
+        working-directory: examples/demo
+        run: |
+          python generate_logs.py logs
+          auspex validate
+          auspex rules import --apply
+          auspex analyze --logs logs --now logs
+          auspex findings --min-severity high
+      - name: Vérifier les règles d'identification livrées
+        run: python -c "from auspex.fingerprint import load_rules; r = load_rules(['rules']); print(len(r), 'règles valides')"
+
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-24.04
+    needs: tests
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e . cyclonedx-bom
+      - run: cyclonedx-py environment --of JSON -o sbom.cdx.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: sbom
+          path: sbom.cdx.json
+
+  sensor:
+    name: Capteur (Zeek réel)
+    runs-on: ubuntu-24.04
+    needs: [tests, changes]
+    if: needs.changes.outputs.capteur == 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: Construire l'image capteur
+        run: docker build -t auspex-sensor:ci sensor
+      - name: Versions embarquées
+        run: docker run --rm auspex-sensor:ci version
+      - name: Générer la capture de test
+        run: |
+          mkdir -p ci/pcap ci/logs
+          python tools/pcapgen.py ci/pcap/lab.pcap
+      - name: Zeek sur la capture, réseau coupé, système en lecture seule
+        run: |
+          docker run --rm --network none --read-only --tmpfs /tmp \
+            -v "$PWD/ci/pcap:/pcap:ro" -v "$PWD/ci/logs:/logs" \
+            auspex-sensor:ci read /pcap/lab.pcap
+          ls -la ci/logs/lab
+      - name: Tests d'intégration
+        env:
+          AUSPEX_ZEEK_LOGS: ci/logs/lab
+        run: pytest -q -rxXs tests/integration --junitxml=ci/integration.xml
+      - name: Diagnostic (annotations)
+        if: always()
+        run: python tools/ci_annotate.py ci/logs/lab ci/integration.xml
+      - name: Publier les logs Zeek
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: zeek-logs
+          path: ci/logs
+
+  netbox:
+    name: NetBox réel
+    runs-on: ubuntu-24.04
+    needs: [tests, changes]
+    if: needs.changes.outputs.netbox == 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: netbox
+          POSTGRES_PASSWORD: netbox
+          POSTGRES_DB: netbox
+        options: >-
+          --health-cmd "pg_isready -U netbox" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: Démarrer NetBox
+        run: |
+          docker run -d --name netbox --network ${{ job.services.postgres.network }} -p 8080:8080 \
+            -e DB_HOST=postgres -e DB_NAME=netbox -e DB_USER=netbox -e DB_PASSWORD=netbox \
+            -e REDIS_HOST=redis -e REDIS_CACHE_HOST=redis \
+            -e SECRET_KEY=ci-only-not-a-secret-0123456789abcdefghijklmnopqrstuvwxyz \
+            -e SUPERUSER_NAME=admin -e SUPERUSER_EMAIL=admin@example.invalid \
+            -e SUPERUSER_PASSWORD=Auspex-CI-2026 -e SKIP_SUPERUSER=false \
+            netboxcommunity/netbox:v4.4
+          for i in $(seq 1 90); do
+            curl -fsS -o /dev/null http://127.0.0.1:8080/login/ && break
+            sleep 5
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:8080/login/ || { docker logs netbox | tail -50; exit 1; }
+      - name: Obtenir un jeton d'API
+        run: |
+          RESP=$(curl -sS -X POST http://127.0.0.1:8080/api/users/tokens/provision/ \
+            -H "Content-Type: application/json" -H "Accept: application/json" \
+            -d '{"username":"admin","password":"Auspex-CI-2026"}')
+          TOKEN=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(d.get('key') or d.get('token') or '')")
+          if [ -z "$TOKEN" ]; then echo "::error title=Jeton NetBox::$RESP"; exit 1; fi
+          echo "::add-mask::$TOKEN"
+          echo "NETBOX_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+      - name: Tests d'intégration NetBox
+        env:
+          AUSPEX_NETBOX_URL: http://127.0.0.1:8080
+        run: |
+          mkdir -p ci
+          pytest -q -rxXs tests/integration/test_netbox_real.py --junitxml=ci/netbox.xml
+      - name: Diagnostic (annotations)
+        if: always()
+        run: |
+          mkdir -p ci
+          python tools/ci_annotate.py ci/none ci/netbox.xml
+          docker logs netbox 2>&1 | tail -30 | sed 's/^/  /' > ci/netbox.log || true
+          python -c "import sys; print('::notice title=Journal NetBox::' + open('ci/netbox.log').read().replace('%','%25').replace('\\n','%0A'))"
+
+  central:
+    name: Central (docker compose, installation et mise à jour)
+    runs-on: ubuntu-24.04
+    needs: [tests, changes]
+    if: needs.changes.outputs.central == 'true'
+    timeout-minutes: 45
+    env:
+      A: docker compose exec -T auspex auspex -c /etc/auspex/auspex.yaml
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Données de démonstration
+        run: |
+          python examples/demo/generate_logs.py deploy/logs
+          mkdir -p deploy/config
+          cp examples/demo/regles-flux.csv deploy/config/regles-flux.csv
+      - name: Installation en une commande
+        working-directory: deploy
+        env:
+          AUSPEX_INTERVAL: "20"
+        run: ./install.sh
+      - name: Premier cycle du service
+        working-directory: deploy
+        run: |
+          for i in $(seq 1 60); do $A health && break; sleep 10; done
+          $A health
+          docker compose logs --no-log-prefix auspex | grep '"event": "cycle"' | tail -1
+      - name: Écarts détectés et inventaire écrit dans NetBox
+        working-directory: deploy
+        run: |
+          $A findings --json > ../ci-findings.json
+          python - <<'PY'
+          import json
+          f = json.load(open("../ci-findings.json"))
+          types = {x["type"] for x in f}
+          print(sorted(types))
+          for t in ("flux_non_declare_persistant", "flux_admin_inter_tiers", "flux_it_vers_ot_direct",
+                    "regle_expiree_utilisee", "actif_inconnu"):
+              assert t in types, f"écart attendu absent : {t}"
+          PY
+          docker compose exec -T auspex python - <<'PY'
+          import os
+          from auspex.netbox import NetBoxClient
+          c = NetBoxClient("http://netbox:8080", os.environ["NETBOX_TOKEN"])
+          ips = {o["address"].split("/")[0]: o for o in c.list("/api/ipam/ip-addresses/")}
+          print(len(ips), "adresses dans NetBox")
+          assert ips["10.2.1.11"]["custom_fields"]["auspex_type"] == "Machine virtuelle"
+          assert ips["172.16.2.20"]["custom_fields"]["auspex_model"].startswith("1769-L33ER")
+          PY
+      - name: Jeton administrateur public de NetBox refusé
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Token 0123456789abcdef0123456789abcdef01234567" \
+            http://127.0.0.1:8080/api/extras/custom-fields/)
+          echo "réponse au jeton par défaut : $code"
+          test "$code" = "403"
+      - name: Librarian, compte de service aux droits restreints
+        working-directory: deploy
+        run: |
+          ADMIN=$(grep '^NETBOX_ADMIN_TOKEN=' .env | cut -d= -f2-)
+          LIB=$(grep '^LIBRARIAN_TOKEN=' .env | cut -d= -f2-)
+          echo "::add-mask::$ADMIN"
+          echo "::add-mask::$LIB"
+          # Le conteneur Auspex ne détient que le jeton de Librarian
+          test "$(docker compose exec -T auspex printenv NETBOX_TOKEN)" = "$LIB"
+          if docker compose exec -T auspex env | grep -qF "$ADMIN"; then
+            echo "::error::le jeton administrateur est présent dans le conteneur Auspex"; exit 1
+          fi
+          # Depuis le conteneur Auspex (réseau interne, d'où Librarian est
+          # légitime) : ce sont bien les permissions de NetBox qui refusent.
+          ADMIN="$ADMIN" LIB="$LIB" docker compose exec -T -e ADMIN -e LIB auspex python - <<'PY'
+          import json, os, urllib.error, urllib.request
+          URL = "http://netbox:8080"
+          def call(token, method, path, body=None):
+              req = urllib.request.Request(URL + path, method=method,
+                  data=json.dumps(body).encode() if body is not None else None,
+                  headers={"Authorization": "Token " + token, "Accept": "application/json",
+                           "Content-Type": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as r:
+                      raw = r.read()
+                      return r.status, (json.loads(raw) if raw else None)
+              except urllib.error.HTTPError as e:
+                  return e.code, None
+          lib, admin = os.environ["LIB"], os.environ["ADMIN"]
+          ip = call(lib, "GET", "/api/ipam/ip-addresses/?limit=1")[1]["results"][0]["id"]
+          refus = {
+              "lister les utilisateurs": call(lib, "GET", "/api/users/users/"),
+              "créer un site": call(lib, "POST", "/api/dcim/sites/", {"name": "Pirate", "slug": "pirate"}),
+              "créer une IP non marquée": call(lib, "POST", "/api/ipam/ip-addresses/",
+                                               {"address": "10.250.0.1/32", "description": "pirate"}),
+              "supprimer une IP": call(lib, "DELETE", f"/api/ipam/ip-addresses/{ip}/"),
+              "créer un champ": call(lib, "POST", "/api/extras/custom-fields/",
+                                     {"name": "pirate", "type": "text", "object_types": ["ipam.ipaddress"]}),
+          }
+          for action, (code, _) in refus.items():
+              print(f"Librarian — {action} : HTTP {code}")
+              assert code == 403, f"Librarian ne devrait pas pouvoir : {action}"
+          code, data = call(admin, "GET", "/api/core/object-changes/?user_name=Librarian&limit=1")
+          print("modifications attribuées à Librarian :", data and data["count"])
+          assert code == 200 and data["count"] > 0
+          PY
+      - name: Trusted hosts — user1 refusé hors de ses deux adresses
+        working-directory: deploy
+        run: |
+          pip install -q pyyaml
+          python ../tools/ci_trusted_hosts.py
+          $A health
+      - name: Double authentification (application et e-mail) des comptes locaux
+        working-directory: deploy
+        run: |
+          # Messagerie de test : reçoit les codes envoyés par NetBox
+          docker run -d --name mailpit --network auspex_default -p 127.0.0.1:8025:8025 axllent/mailpit:latest
+          for i in $(seq 30); do curl -sf http://127.0.0.1:8025/api/v1/messages >/dev/null && break; sleep 1; done
+          python ../tools/ci_mfa.py
+          $A health
+      - name: Annuaire LDAPS (vrai OpenLDAP, certificat vérifié)
+        working-directory: deploy
+        run: |
+          python ../tools/ci_ldap.py
+          # NetBox vient de redémarrer : on attend un cycle réussi d'Auspex (toutes les 20 s)
+          for i in $(seq 12); do $A health >/dev/null 2>&1 && break; sleep 10; done
+          $A health || { echo "::error title=LDAPS::santé du central après le passage en LDAPS"; exit 1; }
+      - name: Connexion unique OIDC (vrai Keycloak, certificat vérifié)
+        working-directory: deploy
+        run: |
+          # Le navigateur simulé et NetBox joignent Keycloak sous le même nom
+          echo "127.0.0.1 sso.ville.test" | sudo tee -a /etc/hosts
+          python ../tools/ci_oidc.py
+          for i in $(seq 12); do $A health >/dev/null 2>&1 && break; sleep 10; done
+          $A health || { echo "::error title=OIDC::santé du central après le passage en OIDC"; exit 1; }
+      - name: Connexion unique SAML (même Keycloak, signature vérifiée)
+        working-directory: deploy
+        run: |
+          python ../tools/ci_saml.py
+          for i in $(seq 12); do $A health >/dev/null 2>&1 && break; sleep 10; done
+          $A health || { echo "::error title=SAML::santé du central après le passage en SAML"; exit 1; }
+      - name: Tableau de bord (widgets NetBox, page des écarts)
+        working-directory: deploy
+        shell: bash
+        run: |
+          set +e
+          python ../tools/ci_dashboard.py > dash.log 2>&1
+          rc=$?
+          cat dash.log
+          if [ $rc -ne 0 ]; then
+            # 10 annotations au plus par étape : seulement les échecs et la trace d'erreur
+            grep -v '^::' dash.log | grep -E 'ÉCHEC|Error|Traceback|File "' | tail -9 \
+              | sed 's/^/::error title=Tableau de bord sortie::/'
+          fi
+          exit $rc
+      - name: Exports d'audit signés (service, NetBox, vérification sans Auspex)
+        working-directory: deploy
+        shell: bash
+        run: |
+          set +e
+          python ../tools/ci_audit.py > audit.log 2>&1
+          rc=$?
+          cat audit.log
+          if [ $rc -ne 0 ]; then
+            grep -v '^::' audit.log | grep -E 'ÉCHEC|Error|Traceback|File "' | tail -9 \
+              | sed 's/^/::error title=Audit sortie::/'
+          fi
+          exit $rc
+      - name: Capteur → central (envoi SSH, empreinte vérifiée, attaques)
+        working-directory: deploy
+        shell: bash
+        run: |
+          docker build -q -t auspex-sensor:ci ../sensor >/dev/null
+          set +e
+          python ../tools/ci_capteur.py > capteur.log 2>&1
+          rc=$?
+          cat capteur.log
+          if [ $rc -ne 0 ]; then
+            grep -v '^::' capteur.log | grep -E 'ÉCHEC|Error|Traceback|File "' | tail -9 \
+              | sed 's/^/::error title=Capteur sortie::/'
+            docker compose logs --no-color --tail 40 reception | sed 's/^/::notice title=Réception::/' | tail -5
+          fi
+          exit $rc
+      - name: Clé de sécurité WebAuthn (vrai navigateur, clé virtuelle)
+        working-directory: deploy
+        shell: bash
+        run: |
+          pip install -q playwright
+          python -m playwright install --with-deps chromium >/dev/null
+          set +e
+          python ../tools/ci_webauthn.py > webauthn.log 2>&1
+          rc=$?
+          cat webauthn.log
+          if [ $rc -ne 0 ]; then
+            grep -v '^::' webauthn.log | grep -E 'ÉCHEC|Error|Traceback|File "' | tail -9 \
+              | sed 's/^/::error title=WebAuthn sortie::/'
+          fi
+          exit $rc
+      - name: Carte à puce (front HTTPS, PKI de test, attaques)
+        working-directory: deploy
+        shell: bash
+        run: |
+          set +e
+          python ../tools/ci_carte.py > carte.log 2>&1
+          rc=$?
+          cat carte.log
+          if [ $rc -ne 0 ]; then
+            grep -v '^::' carte.log | grep -E 'ÉCHEC|Error|Traceback|File "' | tail -9 \
+              | sed 's/^/::error title=Carte sortie::/'
+            docker compose logs --no-color --tail 30 acces | sed 's/^/::notice title=Front::/' | tail -5
+          fi
+          exit $rc
+      - name: Conteneur durci
+        working-directory: deploy
+        run: |
+          test "$(docker compose exec -T auspex id -u)" = "$(id -u)"
+          if docker compose exec -T auspex sh -c 'echo x > /opt/auspex/piege' 2>/dev/null; then
+            echo "::error::le système de fichiers du conteneur devrait être en lecture seule"; exit 1
+          fi
+          if docker compose exec -T auspex sh -c 'echo x > /var/lib/auspex/logs/piege' 2>/dev/null; then
+            echo "::error::les logs des capteurs devraient être en lecture seule"; exit 1
+          fi
+      - name: Mise à jour (mêmes versions)
+        working-directory: deploy
+        run: |
+          ./update.sh
+          ls backups/*/netbox.dump
+          # Les inscriptions MFA survivent à la mise à jour
+          docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py auspex_mfa status | grep -q mfa1
+          ls data/backups/auspex-*.tar.gz
+          $A restore --check "/var/lib/auspex/backups/$(ls data/backups | tail -1)"
+      - name: Mise à jour ratée → retour arrière automatique
+        working-directory: deploy
+        run: |
+          before=$(docker compose exec -T auspex python -c "import os; from auspex.netbox import NetBoxClient; print(len(NetBoxClient('http://netbox:8080', os.environ['NETBOX_TOKEN']).list('/api/ipam/ip-addresses/')))")
+          if ./update.sh --netbox v0.0.0-inexistant; then
+            echo "::error::la mise à jour vers une version inexistante aurait dû échouer"; exit 1
+          fi
+          grep -q '^NETBOX_VERSION=v4.4$' .env
+          $A health
+          after=$(docker compose exec -T auspex python -c "import os; from auspex.netbox import NetBoxClient; print(len(NetBoxClient('http://netbox:8080', os.environ['NETBOX_TOKEN']).list('/api/ipam/ip-addresses/')))")
+          echo "adresses avant : $before, après retour arrière : $after"
+          test "$before" = "$after"
+      - name: Diagnostic (annotations)
+        if: always()
+        working-directory: deploy
+        run: |
+          docker compose ps > ../ci-ps.txt 2>&1 || true
+          docker compose logs --tail 40 auspex > ../ci-auspex.txt 2>&1 || true
+          { docker compose logs netbox 2>&1 | grep -E 'auspex|Traceback|Error' | tail -40; \
+            docker compose logs --tail 15 netbox; } > ../ci-netbox.txt 2>&1 || true
+          python - <<'PY'
+          for name, title in (("ps", "Conteneurs"), ("auspex", "Journal Auspex"), ("netbox", "Journal NetBox")):
+              txt = open(f"../ci-{name}.txt").read()[-20000:]
+              print(f"::notice title={title}::" + txt.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
+          PY
+
+  appliance:
+    name: Appliance capteur (ISO en machine virtuelle)
+    runs-on: ubuntu-24.04
+    needs: [tests, changes]
+    if: needs.changes.outputs.appliance == 'true'
+    timeout-minutes: 90
+    env:
+      A: docker compose exec -T auspex auspex -c /etc/auspex/auspex.yaml
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Image du capteur et racine de l'appliance
+        run: |
+          docker build -q -t auspex-sensor:ci sensor >/dev/null
+          tools/appliance-rootfs.sh auspex-sensor:ci appliance/out
+      - name: Construction de l'ISO (live-build, Debian 12)
+        run: |
+          docker run --rm --privileged -v "$PWD:/src" debian:bookworm /src/appliance/build.sh
+          sudo chown -R "$(id -u):$(id -g)" appliance/out
+          ls -la appliance/out
+          echo "::notice title=ISO::$(cd appliance/out && du -h auspex-capteur-*.iso | cut -f1) — $(cat appliance/out/*.sha256)"
+      - name: Installation du central
+        working-directory: deploy
+        env:
+          AUSPEX_INTERVAL: "20"
+        run: |
+          ./install.sh
+          for i in $(seq 1 60); do $A health && break; sleep 10; done
+      - name: Outils de virtualisation
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils mtools dosfstools tcpreplay squashfs-tools >/dev/null
+          pip install -q pyyaml
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          ls -la /dev/kvm || echo "pas de KVM : émulation (plus lent)"
+      - name: L'appliance démarre, écoute sans émettre, alimente le central et se met à jour
+        working-directory: deploy
+        shell: bash
+        run: |
+          set +e
+          python ../tools/ci_appliance.py > appliance.log 2>&1
+          rc=$?
+          cat appliance.log
+          if [ $rc -ne 0 ]; then
+            grep -v '^::' appliance.log | grep -E 'ÉCHEC|Error|Traceback|File "' | tail -9 \
+              | sed 's/^/::error title=Appliance sortie::/'
+          fi
+          exit $rc
+      - name: Console série et captures (diagnostic)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: appliance-diagnostic
+          path: |
+            deploy/appliance-ci/serie.log
+            deploy/appliance-ci/*.pcap
+            deploy/appliance-ci/qemu.err
+          retention-days: 7
+      - name: ISO du capteur
+        uses: actions/upload-artifact@v6
+        with:
+          name: auspex-capteur-iso
+          path: |
+            appliance/out/auspex-capteur-*.iso*
+            appliance/out/auspex-capteur-*.squashfs*
+          retention-days: 7
+

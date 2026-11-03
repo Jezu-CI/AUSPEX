@@ -1,0 +1,15 @@
+[Unit]
+Description=Auspex : aucune émission réseau avant la configuration
+DefaultDependencies=no
+After=systemd-udev-trigger.service nftables.service
+Before=systemd-networkd.service network-pre.target auspex-donnees.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/bin/udevadm settle --timeout=30
+ExecStart=/usr/local/sbin/auspex-silence
+
+[Install]
+WantedBy=multi-user.target

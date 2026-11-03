@@ -1,0 +1,12 @@
+id,source,destination,protocole,port,description,proprietaire,expire_le
+C-001,T2-postes,T0-AD,tcp,88;389;3268;445;135,Authentification et GPO,Equipe AD,
+C-002,T2-postes,T0-AD,udp,53,DNS,Equipe AD,
+C-003,T1-serveurs,T0-AD,tcp,88;445,Authentification serveurs,Equipe AD,
+C-004,T1-serveurs,T0-AD,udp,53,DNS serveurs,Equipe AD,
+C-010,T2-postes,T1-serveurs,tcp,445,Partages de fichiers,Equipe infra,
+C-011,T2-postes,T1-serveurs,tcp,443,Intranet,Equipe infra,
+C-012,T2-postes,10.1.0.30,tcp,1433,Application metier,Equipe applicative,
+C-020,ADMIN-bastion,T1-serveurs,tcp,3389,Administration serveurs,Equipe infra,
+C-030,OT-DMZ,OT-N2,tcp,502,Supervision SCADA,Automatisme,
+C-031,ADMIN-bastion,OT-N2,tcp,22,Maintenance prestataire automates,Prestataire X,2026-10-22
+C-040,T2-postes,T1-serveurs,tcp,8080,Ancienne application decommissionnee,Equipe applicative,

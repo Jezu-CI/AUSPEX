@@ -1,0 +1,72 @@
+#!/bin/bash
+# Configuration du capteur.
+#   - support étiqueté AUSPEX-CONF (clé USB, disque virtuel) : capteur.conf et,
+#     facultativement, une clé d'envoi fournie (cle, cle.pub) sont importés ;
+#   - clé d'envoi créée si absente (affichée sur la console, à déclarer sur le
+#     central) ;
+#   - configuration validée, interfaces résolues : /run/auspex/capteur.env.
+# Sans configuration valide, le capteur n'écoute ni n'envoie rien : la console
+# propose de la saisir.
+set -euo pipefail
+. /usr/local/lib/auspex/lib.sh
+trap 'msg "ERREUR $(basename "$0") ligne $LINENO : $BASH_COMMAND"' ERR
+mkdir -p "$RUN"
+rm -f "$RUN/capteur.env" "$RUN/etat"
+
+seed=$(blkid -L "$SEED_LABEL" 2>/dev/null || true)
+if [ -n "$seed" ]; then
+    mkdir -p /run/auspex-seed
+    if mount -o ro,nodev,nosuid,noexec "$seed" /run/auspex-seed; then
+        if [ -f /run/auspex-seed/capteur.conf ]; then
+            if load_conf /run/auspex-seed/capteur.conf; then
+                install -m 600 /run/auspex-seed/capteur.conf "$CONF"
+                msg "configuration importée depuis $SEED_LABEL"
+            else
+                msg "ERREUR : capteur.conf de $SEED_LABEL invalide, non importé"
+            fi
+        fi
+        if [ -f /run/auspex-seed/cle ] && [ ! -f "$DATA/cle/cle" ]; then
+            # Copiée en 600 avant tout contrôle : sur une clé FAT, les fichiers
+            # paraissent ouverts à tous et ssh-keygen refuserait de les lire.
+            install -m 600 /run/auspex-seed/cle "$DATA/cle/cle.import"
+            if ssh-keygen -y -f "$DATA/cle/cle.import" > "$DATA/cle/cle.pub.import" 2>/dev/null \
+                    && grep -q '^ssh-ed25519 ' "$DATA/cle/cle.pub.import"; then
+                mv "$DATA/cle/cle.import" "$DATA/cle/cle"
+                mv "$DATA/cle/cle.pub.import" "$DATA/cle/cle.pub"
+                msg "clé d'envoi importée depuis $SEED_LABEL"
+            else
+                rm -f "$DATA/cle/cle.import" "$DATA/cle/cle.pub.import"
+                msg "ERREUR : clé de $SEED_LABEL illisible ou non Ed25519, non importée"
+            fi
+        fi
+        umount /run/auspex-seed
+    fi
+fi
+
+if [ ! -f "$DATA/cle/cle" ]; then
+    ssh-keygen -q -t ed25519 -N '' -C "auspex-capteur" -f "$DATA/cle/cle"
+    msg "clé d'envoi créée"
+fi
+chmod 600 "$DATA/cle/cle"
+msg "clé d'envoi : $(ssh-keygen -l -f "$DATA/cle/cle.pub" | awk '{print $2}')"
+
+if ! load_conf "$CONF"; then
+    echo "a-configurer" > "$RUN/etat"
+    msg "capteur à configurer (console, ou support $SEED_LABEL)"
+    exit 0
+fi
+ecoute=$(resolve_iface "${C[ECOUTE_INTERFACE]}") || { msg "ERREUR : interface d'écoute ${C[ECOUTE_INTERFACE]} introuvable"; echo "erreur" > "$RUN/etat"; exit 0; }
+admin=$(resolve_iface "${C[ADMIN_INTERFACE]}" "$ecoute") || { msg "ERREUR : interface d'administration ${C[ADMIN_INTERFACE]} introuvable"; echo "erreur" > "$RUN/etat"; exit 0; }
+if [ "$admin" = "$ecoute" ]; then
+    msg "ERREUR : interfaces d'administration et d'écoute identiques ($admin)"; echo "erreur" > "$RUN/etat"; exit 0
+fi
+umask 077
+cat > "$RUN/capteur.env" <<ENV
+NOM=${C[NOM]}
+ADMIN=$admin
+ECOUTE=$ecoute
+AUSPEX_CENTRAL=${C[CENTRAL]}
+AUSPEX_CENTRAL_EMPREINTE=${C[CENTRAL_EMPREINTE]}
+ENV
+echo "configure" > "$RUN/etat"
+msg "configuration valide : administration $admin, écoute $ecoute, central ${C[CENTRAL]}"

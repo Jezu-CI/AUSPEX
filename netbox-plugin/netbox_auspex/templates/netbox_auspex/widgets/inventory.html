@@ -1,0 +1,17 @@
+{% include "netbox_auspex/widgets/_freshness.html" %}
+{% if snapshot %}
+<div class="row text-center mb-2 g-1" id="auspex-inventory-counters">
+  <div class="col"><div class="h3 mb-0">{{ inv.total }}</div><small class="text-muted">actifs</small></div>
+  <div class="col"><div class="h3 mb-0{% if inv.new_24h %} text-orange{% endif %}">{{ inv.new_24h }}</div><small class="text-muted">nouveaux 24 h</small></div>
+  <div class="col"><div class="h3 mb-0">{{ inv.silent_7d }}</div><small class="text-muted">silencieux 7 j</small></div>
+  <div class="col"><div class="h3 mb-0">{{ inv.unidentified }}</div><small class="text-muted">non identifiés</small></div>
+</div>
+{% for name, n, pct in rows %}
+  <div class="d-flex justify-content-between small"><span>{{ name }}</span><span class="text-muted">{{ n }}</span></div>
+  <div class="progress mb-1" style="height:6px" role="progressbar" aria-label="{{ name }}" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:{{ pct }}%"></div></div>
+{% endfor %}
+{% if inv.new %}
+<div class="small text-muted mt-2">Derniers apparus :</div>
+<ul class="list-unstyled small mb-0">{% for a in inv.new|slice:":5" %}<li><code>{{ a.ip }}</code> {{ a.hostname|default:"" }} <span class="text-muted">{{ a.device_type|default:"" }} {{ a.zone|default:"" }}</span></li>{% endfor %}</ul>
+{% endif %}
+{% endif %}

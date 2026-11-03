@@ -1,0 +1,51 @@
+name: Règle d'identification
+description: Proposer d'identifier un équipement (ou corriger une identification erronée)
+labels: [règle d'identification]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Les règles (`rules/*.yaml`) sont des données, pas du code : voir
+        [Contribuer](https://github.com/Jezu-CI/AUSPEX/blob/main/CONTRIBUTING.md).
+        Les empreintes doivent venir d'une **observation réelle**, jamais de mémoire.
+        Retirer toute adresse, tout nom d'hôte et tout identifiant propre à votre site.
+  - type: dropdown
+    id: nature
+    attributes:
+      label: Nature
+      options:
+        - Équipement non identifié
+        - Identification incorrecte (faux positif)
+        - Identification incomplète (modèle, firmware, rôle manquant)
+    validations:
+      required: true
+  - type: input
+    id: equipement
+    attributes:
+      label: Équipement
+      placeholder: "Fabricant, modèle, version de firmware"
+    validations:
+      required: true
+  - type: input
+    id: protocole
+    attributes:
+      label: Protocole et port observés
+      placeholder: "S7comm 102/tcp, EtherNet/IP 44818/tcp, BACnet 47808/udp…"
+  - type: textarea
+    id: indices
+    attributes:
+      label: Enregistrement Zeek observé (anonymisé)
+      description: La ligne du log Zeek (conn, s7comm, enip_list_identity, http…) qui porte l'indice.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: resultat
+    attributes:
+      label: Identification actuelle et identification attendue
+  - type: checkboxes
+    id: capture
+    attributes:
+      label: Capture
+      options:
+        - label: Je peux fournir une capture anonymisée, ou elle est publique (lien ci-dessus)

@@ -1,0 +1,414 @@
+# Règles d'identification passive — SI de gestion (IT)
+#
+# Chaque règle : un type de log Zeek (log), l'actif qui reçoit le vote
+# (target : orig = client, resp = serveur, ou nom d'un champ IP), des
+# conditions sur les champs (match) et des votes pondérés (set + weight).
+#
+# Conditions possibles : valeur exacte, {one_of: [...]}, {regex: "..."},
+# {exists: true/false}. Dans les votes, {1} reprend le 1er groupe capturé
+# par la regex, et {nom_de_champ} reprend la valeur d'un champ du log.
+#
+# Les poids sont volontairement prudents : un port ouvert est un indice,
+# pas une preuve. C'est le cumul d'indices concordants qui fait la confiance.
+
+rules:
+  # --- Services Microsoft / Active Directory (répondeur) ---
+  - id: it-kerberos-kdc
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 88 }
+    set: { role: "Contrôleur de domaine (Kerberos)", os_family: Windows }
+    weight: 0.6
+    description: KDC Kerberos ; Samba AD existe, d'où un poids modéré sur l'OS
+
+  - id: it-ldap-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: { one_of: [389, 636, 3268, 3269] } }
+    set: { role: "Annuaire LDAP" }
+    weight: 0.5
+
+  - id: it-global-catalog
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: { one_of: [3268, 3269] } }
+    set: { role: "Contrôleur de domaine (Kerberos)", os_family: Windows }
+    weight: 0.6
+    description: Le catalogue global est propre à Active Directory
+
+  - id: it-rdp-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 3389 }
+    set: { os_family: Windows }
+    weight: 0.6
+
+  - id: it-msrpc-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 135 }
+    set: { os_family: Windows }
+    weight: 0.5
+
+  - id: it-winrm-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: { one_of: [5985, 5986] } }
+    set: { os_family: Windows }
+    weight: 0.6
+
+  - id: it-smb-server
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 445 }
+    set: { os_family: Windows, role: "Partage de fichiers SMB" }
+    weight: 0.35
+    description: Samba et de nombreux NAS exposent aussi SMB
+
+  # --- Rôles serveur génériques ---
+  - id: it-dns-server
+    log: conn
+    target: resp
+    match: { id.resp_p: 53, service: { regex: "dns" } }
+    set: { role: "Serveur DNS" }
+    weight: 0.6
+
+  - id: it-ntp-server
+    log: conn
+    target: resp
+    match: { proto: udp, id.resp_p: 123 }
+    set: { role: "Serveur NTP" }
+    weight: 0.5
+
+  - id: it-dhcp-server
+    log: dhcp
+    target: server_addr
+    match: { server_addr: { exists: true } }
+    set: { role: "Serveur DHCP" }
+    weight: 0.7
+    require_established: false
+
+  - id: it-mssql
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 1433 }
+    set: { role: "Base de données SQL Server" }
+    weight: 0.6
+
+  - id: it-postgres
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 5432 }
+    set: { role: "Base de données PostgreSQL" }
+    weight: 0.6
+
+  - id: it-mysql
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 3306 }
+    set: { role: "Base de données MySQL/MariaDB" }
+    weight: 0.6
+
+  - id: it-web-server
+    log: conn
+    target: resp
+    match: { proto: tcp, service: { regex: "^(http|ssl)" } }
+    set: { role: "Serveur web" }
+    weight: 0.35
+
+  - id: it-printer-raw
+    log: conn
+    target: resp
+    match: { proto: tcp, id.resp_p: 9100 }
+    set: { device_type: Imprimante }
+    weight: 0.6
+
+  - id: it-syslog-collector
+    log: conn
+    target: resp
+    match: { proto: udp, id.resp_p: 514 }
+    set: { role: "Collecteur syslog" }
+    weight: 0.4
+    require_established: false
+
+  # --- Bannières SSH (ssh.log, champ server) ---
+  - id: it-ssh-ubuntu
+    log: ssh
+    target: resp
+    match: { server: { regex: "OpenSSH_([\\d.p]+).*Ubuntu" } }
+    set: { os_family: Linux, os_version: Ubuntu }
+    weight: 0.8
+
+  - id: it-ssh-debian
+    log: ssh
+    target: resp
+    match: { server: { regex: "OpenSSH_([\\d.p]+).*Debian" } }
+    set: { os_family: Linux, os_version: Debian }
+    weight: 0.8
+
+  - id: it-ssh-windows
+    log: ssh
+    target: resp
+    match: { server: { regex: "OpenSSH_for_Windows" } }
+    set: { os_family: Windows }
+    weight: 0.8
+
+  - id: it-ssh-openssh-generic
+    log: ssh
+    target: resp
+    match: { server: { regex: "OpenSSH" } }
+    set: { os_family: "Unix/Linux" }
+    weight: 0.3
+
+  - id: it-ssh-cisco
+    log: ssh
+    target: resp
+    match: { server: { regex: "SSH-[\\d.]+-Cisco" } }
+    set: { vendor: Cisco, device_type: "Équipement réseau" }
+    weight: 0.8
+
+  - id: it-ssh-mikrotik
+    log: ssh
+    target: resp
+    match: { server: { regex: "ROSSSH" } }
+    set: { vendor: MikroTik, device_type: "Équipement réseau" }
+    weight: 0.8
+
+  # Bannières d'équipements embarqués relevées sur des captures réelles (4SICS 2015)
+  - id: it-ssh-moxa
+    log: ssh
+    target: resp
+    match: { server: { regex: "^SSH-[\\d.]+-moxa" } }
+    set: { vendor: Moxa, device_type: "Équipement réseau industriel" }
+    weight: 0.8
+    description: Serveurs série, passerelles MGate et commutateurs Moxa
+
+  - id: it-ssh-ipssh
+    log: ssh
+    target: resp
+    match: { server: { regex: "^SSH-[\\d.]+-IPSSH" } }
+    set: { os_family: VxWorks, device_type: "Équipement embarqué" }
+    weight: 0.5
+    description: Pile IPnet de Wind River (VxWorks), courante sur les équipements industriels
+
+  - id: it-ssh-mocana
+    log: ssh
+    target: resp
+    match: { server: { regex: "^SSH-[\\d.]+-Mocana" } }
+    set: { device_type: "Équipement embarqué" }
+    weight: 0.5
+    description: Pile SSH Mocana, intégrée à de nombreux équipements industriels et réseau
+
+  - id: it-ssh-dropbear
+    log: ssh
+    target: resp
+    match: { server: { regex: "^SSH-[\\d.]+-dropbear" } }
+    set: { os_family: Linux, device_type: "Équipement embarqué" }
+    weight: 0.5
+    description: Serveur SSH léger des Linux embarqués (routeurs, passerelles, IHM)
+
+  # --- Outils de balayage (client) : signalés comme rôle, à expliquer ---
+  - id: it-ssh-client-nmap
+    log: ssh
+    target: orig
+    match: { client: { regex: "^SSH-[\\d.]+-Nmap" } }
+    set: { role: "Outil de balayage (Nmap)" }
+    weight: 0.9
+
+  # --- User-Agent HTTP (le client se dévoile) ---
+  - id: it-ua-windows-nt10
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Windows NT 10\\.0" } }
+    set: { os_family: Windows, os_version: "Windows 10/11 ou Server 2016+" }
+    weight: 0.6
+
+  - id: it-ua-windows-nt63
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Windows NT 6\\.3" } }
+    set: { os_family: Windows, os_version: "Windows 8.1 ou Server 2012 R2" }
+    weight: 0.6
+
+  - id: it-ua-windows-nt61
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Windows NT 6\\.1" } }
+    set: { os_family: Windows, os_version: "Windows 7 ou Server 2008 R2 (obsolète)" }
+    weight: 0.6
+
+  - id: it-ua-cryptoapi
+    log: http
+    target: orig
+    match: { user_agent: { regex: "^Microsoft-CryptoAPI" } }
+    set: { os_family: Windows }
+    weight: 0.6
+    description: Vérification de certificats par Windows (CRL, OCSP)
+
+  - id: it-ua-delivery-optimization
+    log: http
+    target: orig
+    match: { user_agent: { regex: "^Microsoft-Delivery-Optimization" } }
+    set: { os_family: Windows }
+    weight: 0.6
+
+  - id: it-ua-macos
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Macintosh; .*Mac OS X" } }
+    set: { os_family: macOS }
+    weight: 0.6
+
+  - id: it-ua-android
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Android ([\\d.]+)" } }
+    set: { os_family: Android, os_version: "Android {1}", device_type: "Mobile ou tablette" }
+    weight: 0.6
+
+  - id: it-ua-ios
+    log: http
+    target: orig
+    match: { user_agent: { regex: "(iPhone|iPad)" } }
+    set: { os_family: iOS, device_type: "Mobile ou tablette" }
+    weight: 0.6
+
+  - id: it-ua-apt
+    log: http
+    target: orig
+    match: { user_agent: { regex: "^Debian APT-HTTP" } }
+    set: { os_family: Linux, os_version: "Debian/Ubuntu" }
+    weight: 0.7
+
+  - id: it-ua-dnf
+    log: http
+    target: orig
+    match: { user_agent: { regex: "libdnf \\(([^;)]+)" } }
+    set: { os_family: Linux, os_version: "{1}" }
+    weight: 0.7
+
+  - id: it-ua-windows-nt62
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Windows NT 6\\.2" } }
+    set: { os_family: Windows, os_version: "Windows 8 ou Server 2012 (obsolète)" }
+    weight: 0.6
+
+  - id: it-ua-windows-nt60
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Windows NT 6\\.0" } }
+    set: { os_family: Windows, os_version: "Windows Vista ou Server 2008 (obsolète)" }
+    weight: 0.6
+
+  - id: it-ua-windows-xp
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Windows NT 5\\.[12]" } }
+    set: { os_family: Windows, os_version: "Windows XP ou Server 2003 (obsolète)" }
+    weight: 0.6
+    description: Encore fréquent sur les IHM et stations d'ingénierie industrielles
+
+  - id: it-ua-linux-desktop
+    log: http
+    target: orig
+    match: { user_agent: { regex: "\\(X11; (?:Ubuntu; )?Linux" } }
+    set: { os_family: Linux }
+    weight: 0.5
+
+  - id: it-ua-ubuntu
+    log: http
+    target: orig
+    match: { user_agent: { regex: "X11; Ubuntu; Linux" } }
+    set: { os_family: Linux, os_version: Ubuntu }
+    weight: 0.5
+
+  - id: it-ua-iceweasel
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Iceweasel/" } }
+    set: { os_family: Linux, os_version: Debian }
+    weight: 0.6
+    description: Firefox renommé, propre à Debian
+
+  - id: it-ua-nmap
+    log: http
+    target: orig
+    match: { user_agent: { regex: "Nmap Scripting Engine" } }
+    set: { role: "Outil de balayage (Nmap)" }
+    weight: 0.9
+
+  # --- Balayage de ports : nombreuses tentatives refusées ou sans réponse ---
+  - id: it-port-scan
+    log: conn
+    target: orig
+    match: { conn_state: { one_of: [REJ, S0] } }
+    count_distinct: [id.resp_h, id.resp_p]
+    min_count: 100
+    require_established: false
+    set: { role: "Balayage de ports (au moins 100 cibles sans réponse ou refusées)" }
+    weight: 0.8
+    description: >-
+      Relevé sur captures réelles : les balayages font apparaître de faux rôles
+      (maître DNP3, client S7...) chez la machine qui balaie. Ce rôle l'explique.
+      REJ (refus) et S0 (sans réponse) seulement : les autres états apparaissent
+      aussi sur des captures asymétriques (un automate y passait pour un scanner).
+
+  # --- Empreintes JA4 (non embarquées en v0.1 : licence FoxIO de JA4+) ---
+  # Si un module ou une future version les fournit : les empreintes JA4 varient
+  # selon les versions de bibliothèques TLS : elles
+  # sont à constituer à partir de captures du lab (jalon J2) plutôt que
+  # recopiées de mémoire. Gabarit à compléter :
+  #
+  # - id: it-ja4-exemple
+  #   log: ssl
+  #   target: orig
+  #   match: { ja4: "<empreinte observée en lab>" }
+  #   set: { os_family: Windows }
+  #   weight: 0.5
+
+  # --- SNMP : description du système (sysDescr) renvoyée par l'équipement ---
+  - id: it-snmp-cisco
+    log: snmp
+    target: resp
+    match: { display_string: { regex: "Cisco IOS" } }
+    set: { vendor: Cisco, device_type: "Équipement réseau", os_family: "Cisco IOS" }
+    weight: 0.8
+
+  - id: it-snmp-linux
+    log: snmp
+    target: resp
+    match: { display_string: { regex: "^Linux " } }
+    set: { os_family: Linux }
+    weight: 0.6
+
+  - id: it-snmp-windows
+    log: snmp
+    target: resp
+    match: { display_string: { regex: "Windows" } }
+    set: { os_family: Windows }
+    weight: 0.6
+
+  # --- En-tête Server des réponses HTTP (champ server, ajouté par le capteur) ---
+  - id: it-http-server-vxworks
+    log: http
+    target: resp
+    match: { server: { regex: "VxWorks" } }
+    set: { os_family: VxWorks, device_type: "Équipement embarqué" }
+    weight: 0.7
+    description: Relevé sur captures réelles (« VxWorks/5.4.2 UPnP/1.0 iGateway »)
+
+  - id: it-http-server-windows
+    log: http
+    target: resp
+    match: { server: { regex: "Microsoft-(HTTPAPI|IIS)" } }
+    set: { os_family: Windows }
+    weight: 0.6
+
+  - id: it-http-server-embedded
+    log: http
+    target: resp
+    match: { server: { regex: "GoAhead|RomPager|\\bBoa/|mini_httpd|Embedthis" } }
+    set: { device_type: "Équipement embarqué" }
+    weight: 0.4
+    description: Serveurs web embarqués (automates, IHM, passerelles, imprimantes)

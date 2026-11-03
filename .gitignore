@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+
+# Données d'exécution : jamais dans Git (carte du SI, adresses, flux)
+state/
+examples/demo/logs/
+*.pcap
+*.pcapng
+
+# Secrets
+.env
+*.key
+*.pem
+
+# Déploiement du central : secrets, configuration locale et données
+deploy/.env
+deploy/config/
+deploy/tls/
+deploy/data/
+deploy/logs/
+deploy/backups/
+
+# Appliance capteur : ISO et racine construites en CI
+appliance/out/

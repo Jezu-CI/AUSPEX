@@ -1,0 +1,13 @@
+[Unit]
+Description=Auspex : réseau du capteur (écoute sans adresse, administration)
+Requires=auspex-parefeu.service
+After=auspex-parefeu.service
+Before=systemd-networkd.service network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/auspex-reseau
+
+[Install]
+WantedBy=multi-user.target

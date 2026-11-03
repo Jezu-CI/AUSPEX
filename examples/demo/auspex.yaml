@@ -1,0 +1,33 @@
+# Configuration de démonstration : un petit site IT/OT.
+# Lancer depuis ce répertoire : voir README.md à la racine du projet.
+version: 1
+channel: stable
+state_dir: ./state
+
+zones:
+  - { name: T0-AD,         class: tier0,     prefixes: [10.0.0.0/24] }
+  - { name: T1-serveurs,   class: tier1,     prefixes: [10.1.0.0/16] }
+  - { name: T2-postes,     class: tier2,     prefixes: [10.2.0.0/16] }
+  - { name: ADMIN-bastion, class: admin,     prefixes: [10.9.0.0/24] }
+  - { name: OT-DMZ,        class: purdue3.5, prefixes: [172.16.35.0/24] }
+  - { name: OT-N2,         class: purdue2,   prefixes: [172.16.2.0/24] }
+
+sensors:
+  - { name: capteur-it, zone: T1-serveurs, interface: eth1, mode: passive }
+  - { name: capteur-ot, zone: OT-N2,       interface: eth1, mode: passive }
+
+flow_rules:
+  file: ./regles-flux.csv
+
+alerts:
+  persistent_after_days: 3
+  unused_rule_after_days: 90
+  outputs:
+    - { type: file, path: ./state/siem.jsonl }
+
+access:
+  trusted_hosts:
+    - { user: user1, allow: [10.10.1.2/32, 172.16.20.2/32] }
+  default: deny_if_unlisted
+
+retention_days: 180

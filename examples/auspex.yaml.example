@@ -1,0 +1,82 @@
+# auspex.yaml — décrit tout un déploiement. Copier ce fichier en auspex.yaml,
+# l'adapter, puis lancer « auspex validate ».
+#
+# Aucun secret dans ce fichier : jetons et mots de passe passent par des
+# variables d'environnement (champs *_env).
+
+version: 1
+channel: stable            # stable | edge | offline (site isolé)
+state_dir: ./state         # données d'exécution : flux, inventaire, alertes
+retention_days: 180        # durée de conservation des observations (RGPD)
+
+# Zones réseau. class : tier0, tier1, tier2, admin, dmz, other (IT)
+# ou purdue0 à purdue5, purdue3.5 (OT). Une IP appartient à la zone dont
+# le préfixe est le plus spécifique.
+zones:
+  - { name: T0-AD,         class: tier0,     prefixes: [10.0.0.0/24] }
+  - { name: T1-serveurs,   class: tier1,     prefixes: [10.1.0.0/16] }
+  - { name: T2-postes,     class: tier2,     prefixes: [10.2.0.0/16] }
+  - { name: ADMIN-bastion, class: admin,     prefixes: [10.9.0.0/24] }
+  - { name: OT-DMZ,        class: purdue3.5, prefixes: [172.16.35.0/24] }
+  - { name: OT-N2,         class: purdue2,   prefixes: [172.16.2.0/24] }
+
+# Capteurs passifs. Le mode « active-light » est refusé en zone OT.
+sensors:
+  - { name: capteur-it, zone: T1-serveurs, interface: eth1, mode: passive }
+  - { name: capteur-ot, zone: OT-N2,       interface: eth1, mode: passive }
+
+# Règles de flux autorisés (CSV ou XLSX, voir examples/demo/regles-flux.csv)
+flow_rules:
+  file: ./regles-flux.xlsx
+
+alerts:
+  persistent_after_days: 3      # un flux non déclaré devient « persistant »
+  unused_rule_after_days: 90    # une règle sans trafic devient « inutilisée »
+  check_intra_zone: false       # true = exiger aussi des règles à l'intérieur des zones
+  outputs:
+    # ca_file : certificat de l'autorité qui a signé le certificat du SIEM
+    # (à fournir ; sinon le magasin de certificats du système est utilisé)
+    - { type: syslog, url: "tls://siem.client.local:6514", format: cef, ca_file: ./ac-siem.pem }
+    - { type: webhook, url: "https://soar.client.local/hooks/auspex", token_env: SOAR_TOKEN, min_severity: high }
+    # - { type: file, path: ./state/alertes.jsonl }
+
+# NetBox (jalon J4). Le jeton est lu dans la variable d'environnement indiquée.
+netbox:
+  url: https://netbox.client.local
+  token_env: NETBOX_TOKEN
+  silent_after_days: 30     # un équipement déclaré non vu depuis N jours est « silencieux »
+  # ca_file: ./ac-netbox.pem
+
+# Restriction des connexions à l'interface par IP source (appliquée par le
+# plugin NetBox, jalon J7)
+access:
+  trusted_hosts:
+    - { user: user1,      allow: [10.10.1.2/32, 172.16.20.2/32] }
+    - { group: admins-t0, allow: [10.0.10.0/28] }
+  default: deny_if_unlisted
+
+# Authentification (jalon J7) : un compte brise-glace local + une méthode principale
+auth:
+  primary: ldaps
+  ldaps:
+    servers: [ldaps://dc01.ville.local, ldaps://dc02.ville.local]
+    bind_dn: "CN=svc-auspex,OU=Services,DC=ville,DC=local"   # mot de passe : AUSPEX_LDAP_BIND_PASSWORD
+    user_search_base: "OU=Utilisateurs,DC=ville,DC=local"
+    user_attribute: sAMAccountName
+    group_search_base: "OU=Groupes,DC=ville,DC=local"
+    group_type: active_directory
+    require_group: "CN=Auspex-Utilisateurs,OU=Groupes,DC=ville,DC=local"
+    # ca_file: ca-ad.pem          # autorité de certification interne
+  break_glass:
+    user: breakglass
+    mfa: totp
+    allow: [10.0.10.5/32]
+  mfa:
+    methods: [totp]               # ajouter email pour les équipes sans téléphone professionnel
+
+# Modules communautaires, versions épinglées (jalon J6)
+modules: []
+#  - github.com/exemple/auspex-module-stormshield-import@v1.2.0
+
+# Règles d'identification supplémentaires (par défaut : rules/ du projet)
+# fingerprint_rules: [./rules, ./mes-regles]

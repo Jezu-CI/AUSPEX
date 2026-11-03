@@ -1,0 +1,55 @@
+{% extends 'base/layout.html' %}
+{% block title %}Exports d'audit{% endblock %}
+{% block content %}
+<div class="row g-3" id="auspex-audits">
+  <div class="col-xl-8">
+    <div class="card">
+      <div class="card-header">{{ exports|length }} export(s) signé(s)</div>
+      <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead><tr><th>Produit le (UTC)</th><th>Référentiel</th><th>Période</th><th>Exigences</th><th>Archive</th></tr></thead>
+        <tbody>
+        {% for e in exports %}
+          <tr>
+            <td class="text-nowrap">{{ e.generated|default:"—" }}{% if e.automatique %}<div class="small text-muted">automatique</div>{% endif %}</td>
+            <td><strong>{{ e.titre }}</strong></td>
+            <td class="text-nowrap">{{ e.period_start }}<br><span class="text-muted">→</span> {{ e.period_end }}</td>
+            <td>
+              <div class="mb-1">{% for label, color, n in e.badges %}<span class="badge bg-{{ color }}-lt me-1">{{ n }} {{ label }}</span>{% endfor %}</div>
+              <div>{% for ref, label, color in e.controls %}<span class="badge bg-{{ color }}-lt text-{{ color }} me-1 mb-1 fw-normal" title="{{ ref }} : {{ label }}">{{ ref }}</span>{% endfor %}</div>
+            </td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-primary" href="{% url 'plugins:netbox_auspex:audit_download' name=e.fichier %}" download>Télécharger</a>
+              <div class="small text-muted">{{ e.size_kb }} Ko<br><span class="font-monospace" title="SHA-256 de l'archive : {{ e.sha256 }}">{{ e.sha256|slice:":8" }}…</span></div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="text-muted">Aucun export pour l'instant. Le service les produit selon
+            <code>audit.referentiels</code> dans auspex.yaml, ou à la demande :
+            <code>auspex audit export nis2</code>.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="card">
+      <div class="card-header">Vérifier un export</div>
+      <div class="card-body">
+        {% if fingerprint %}
+        <p class="mb-1 small text-muted">Empreinte de la clé de signature de cette instance :</p>
+        <p class="font-monospace fs-5 mb-3" id="auspex-audit-key" style="word-break:break-all">{{ fingerprint }}</p>
+        {% endif %}
+        <p class="small">Chaque archive contient le rapport, les preuves (CSV, JSON) et un manifeste signé.
+          Communiquez cette empreinte à l'auditeur par un autre canal ; il vérifie l'archive sans Auspex :</p>
+        <pre class="small mb-2" style="white-space:pre-wrap;word-break:break-all">openssl pkeyutl -verify -pubin \
+  -inkey cle-publique.pem -rawin \
+  -in MANIFEST.json -sigfile MANIFEST.sig
+sha256sum -c SHA256SUMS</pre>
+        <p class="small mb-0 text-muted">Le détail est dans <code>VERIFIER.txt</code>, dans chaque archive.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

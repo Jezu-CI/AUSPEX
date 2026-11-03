@@ -1,0 +1,72 @@
+# Captures publiques rejouées dans le vrai capteur (tools/captures_reelles.py).
+# Source : dépôt automayt/ICS-pcap (compilation de captures de digitalbond, 4SICS /
+# Netresec, Wireshark, scadahacker…), épinglé par commit ; chaque fichier est vérifié
+# par son empreinte SHA-256 (lfs : stocké par Git LFS). Les captures ne sont PAS
+# redistribuées dans ce dépôt : elles sont téléchargées au moment du test.
+
+depot: https://github.com/automayt/ICS-pcap
+commit: 13b7ae335529146b40535c2d7aa756886040d8ad
+
+captures:
+  - { nom: s7-1200-ihm, chemin: "S7/s7-1200-hmi/s7-1200-hmi.pcap", sha256: b38ccaf183673619e7f5d69476293a01da743076a281c96e949f0f29a42d1650, taille: 11559, lfs: true }
+  - { nom: s7-1200-televersement, chemin: "S7/S7-1200-Uploading-OB1-TIAV12/S7-1200-Uploading-OB1-TIAV12.pcap", sha256: 73e4b36469447e0fd45ccd38ca0583fbe60f6df27372b1ca11066e335deb650e, taille: 19895, lfs: true }
+  - { nom: s7-1200-tp1200, chemin: "S7/V13_1200_TP1200sim_MW100_Int_SPS_5s_MW102_Int_SPS_10s_MW102_ab_1000_Timer_sync/V13_1200_TP1200sim_MW100_Int_SPS_5s_MW102_Int_SPS_10s_MW102_ab_1000_Timer_sync.pcapng", sha256: bfb99134c68b10528a26d57116e0551b6dbc9e1ad8e8c34aaf2da3911fae2104, taille: 19948, lfs: false }
+  - { nom: s7-etat-automate, chemin: "S7/s7comm_reading_plc_status/s7comm_reading_plc_status.pcap", sha256: e71f81b471bd67da2fd6e40dc69a7179574ba66771c6150cd7bfe232cc07b8a9, taille: 25112, lfs: true }
+  - { nom: s7-1500-opc, chemin: "S7/S7-1511-opc-request-all-types/S7-1511-opc-request-all-types.pcap", sha256: 19a7da2fa329aabf87cc0073bb487e5bbfe2ec4065f1e1ef5ffb25f75424dbe1, taille: 10270, lfs: true }
+  - { nom: s7-liste-blocs, chemin: "S7/s7comm_program_blocklist_onlineview/s7comm_program_blocklist_onlineview.pcap", sha256: b2e7014362630b803b413dda595e4ba7a3a910105712f448c22dba517ec02851, taille: 13981, lfs: true }
+  - { nom: modbus, chemin: "MODBUS/Modbus/Modbus.pcap", sha256: 9e055a2d15a8e447be131002137341ae5f8f8b91b64576cd2fdbd854e141373e, taille: 8337, lfs: true }
+  - { nom: modbus-donnees-2, chemin: "MODBUS/MODBUS-TestDataPart2/MODBUS-TestDataPart2.pcap", sha256: f7cca627fe9b740b5881e8b33b4143b59158240192ecbf5caa727a7dda35d110, taille: 27764, lfs: true }
+  - { nom: enip-etat-equipement, chemin: "EIP/EIP-ViewDeviceStatus/EIP-ViewDeviceStatus.pcap", sha256: ffec60115587d9c79fd8e6daa712ea868635a0c31ed02bf43e53c76a834b5b01, taille: 2389, lfs: true }
+  - { nom: enip-talabor, chemin: "ETHERNET_IP/talabor1_1/talabor1_1.pcap", sha256: afab219e4df5db70c48af4551de21d9bd122dfe30e75d110db76baf11f2869aa, taille: 39457, lfs: true }
+  - { nom: enip-mb, chemin: "ETHERNET_IP/mb/mb.pcap", sha256: fc91932509a2a777dee0004cb686e92180aae2ad34d8eb3a447573e46091d41d, taille: 7684492, lfs: true }
+  - { nom: dnp3-donnees-1, chemin: "DNP3/DNP3-TestDataPart1/DNP3-TestDataPart1.pcap", sha256: 71779cac342a37b412df5bb6372ec22c35b5127ad2bfed4447d7ab6b92ebb4bf, taille: 15838, lfs: true }
+  - { nom: dnp3-lecture, chemin: "DNP3/DNP3-Read/DNP3-Read.pcap", sha256: 66f460ea8d274085f7b478a73bab987d79cfe062653fb36bdefc5fe942240fbe, taille: 603, lfs: true }
+  - { nom: bacnet-bbmd, chemin: "BACNET/BACnet-BBMD-on-same-subnet/BACnet-BBMD-on-same-subnet.pcap", sha256: 206d976d00202045a45e167b735b46ec9b51ef562e41f31077887cfb4fd2bc91, taille: 1298, lfs: true }
+  - { nom: bacnet-ip-mstp, chemin: "BACNET/BACnetIP-MSTP-Mix/BACnetIP-MSTP-Mix.pcap", sha256: 0c4bfd74c3d55f92f7c2fd05631acee76e2796ea000a07140decf58cee7d46a7, taille: 118053, lfs: true }
+  - { nom: bacnet-programmation, chemin: "BACNET/BACnetL_SchedRPM/BACnetL_SchedRPM.pcapng", sha256: 65d2f0a179b2e7fa9d206355efb29b2383e0fb9ff50ab47621aaa1112644065a, taille: 596, lfs: false }
+  - { nom: iec104, chemin: "IEC 60870/iec104/iec104.pcap", sha256: a78aa971adc51e54413a865937f1799ef57118d397cef57ccd93a358ed5b85d6, taille: 10135, lfs: true }
+  - { nom: iec104-sq, chemin: "IEC 60870/IEC104_SQ/IEC104_SQ.pcapng", sha256: f855a11326f7aa4f719b1fbb65e5f8dfe3d9d194185a8f5faf5b5dc3cb831227, taille: 584, lfs: false }
+  - { nom: omron-fins, chemin: "FINS (OMRON)/omron/omron.pcap", sha256: 561fa39d9680bf88addffefc10a5479d74ec92a3defa96454b7d5e08fcc6bd5d, taille: 20831, lfs: true }
+  - { nom: hart-ip, chemin: "HART IP/hart_ip/hart_ip.pcap", sha256: dda914bff86358caf5bc6e3ed06814124104ecb0eff71e5c7e806fe1b24a09a6, taille: 11932, lfs: true }
+  - { nom: niagara-jace, chemin: "TRIDIUM/tridium-jace2/tridium-jace2.pcap", sha256: 4f8ddcac19b462fcb5f6d7479e4a9b239abf51653a21577afd20ad40cb1991e1, taille: 2168976, lfs: true }
+  - { nom: niagara-plugfest, chemin: "TRIDIUM/plugfest-tridium-1/plugfest-tridium-1.pcap", sha256: 54646e0a5d134362d50295208074fa7913166e07352fb8011f3cdb801dd681af, taille: 584872, lfs: true }
+  - { nom: saia-sbus, chemin: "ETHERSBUS/sbus/sbus.pcap", sha256: 2588478c604a83dd38339a63c49261948796cd964b5e748b20260fc21649d24b, taille: 66825, lfs: true }
+  - { nom: 4sics-20oct, chemin: "Additional Captures/4SICS-GeekLounge-151020/4SICS-GeekLounge-151020.pcap", sha256: 8c6ee02dc26b1b5298a7c9b4dc83cc779bd2a3219d5c5cbc51e3d4d325763bc2, taille: 25711082, lfs: true }
+
+# Logs Zeek d'origine du lab 4SICS 2015 (Zeek 2.4, TSV), en clair dans le même
+# dépôt : analysés par Auspex directement.
+logs_zeek:
+  - nom: 4sics-151021-logs
+    dossier: "Additional Captures/4SICS-GeekLounge-151021"
+    fichiers:
+      conn.log: f24d0b86478a374baa0c689b9401176d8edb3bc22cf9b5236f8b78385288952d
+      dns.log: f8fb52431b4be3146cc68f6e652161168ea7301097b97a2cb5d668dcf3b374b7
+      dpd.log: 26f14dcbd4d43231437fcbf71eddcc5afb88bbd79c261beb3d71697108e617d5
+      files.log: acbb5db82e6ec7373fb193c3da9a1ae48c40c59dcd966aa6dac8be4f493699e9
+      http.log: d616f21d1925d4c9716b3b9c97b9cfe51fa4dd80b94556b39fec894d21dc745e
+      modbus.log: fa30f598ed2f569906c5393eb226ea8ba3b65b5b01ba08e8ea2684bb7ee38e62
+      packet_filter.log: 08fc054b2910b2e987bc38ee6ab27d00ff1c33d0d748bf1b3200e4233743238d
+      reporter.log: d2610244f089c220ea14ce9d596b14515c13279f81418bcfe30e973e4a179c07
+      ssh.log: b01b437d73363f7ae0cd1b22bb39ce633b85544b3597ab51cbacc1416c554ead
+      ssl.log: 6dea4c284defe77522ad23e0648741934ce3487193d055bfa11499348b45de85
+      weird.log: 48974a6cd8156a473608974999663512b20a162cde81954daa23f4a5b86cc3ce
+      x509.log: 7f3e62f3fd579c1a38ea1533076616e9f1cafdcd690755b616c6aec308800da5
+  - nom: 4sics-151022-logs
+    dossier: "Additional Captures/4SICS-GeekLounge-151022"
+    fichiers:
+      conn.log: 1ec6ed2d0d46e323d4a8fceda7a8ac4d2f68206eed3eaf94ebc699e9c34f7d0a
+      dhcp.log: 4ff516972963d4b226b4302eeddac286f9c3eabf010005e8b8523e4389550d0f
+      dnp3.log: 14d00a60bc702f33b1a815ff20528cc4ff9fb2b2b34b79c30b5000211f2e0ea3
+      dns.log: 1dbe7578f95edd2d3d3d891e79dc34f92abd9b5eaa4c327f5907f75fe6bf29fd
+      dpd.log: 6fc5c870cabfea49416d858f495d9fc2a0db2e3fe2e89ba2e613fe47ecb4c11c
+      files.log: 428ed145249d188b98d4b847927a8049f725b774d660efcf1f3a138707156fff
+      ftp.log: 1d7ddac7839bff799e5a260c1e68b8b2b96a7f9d7809f31d4004fd3ada67d379
+      http.log: dd182521597fe647f9b0f1a9922d9b5aa893889d01b9fb1cdd04db0d6ec2aadf
+      modbus.log: 986d46dede6d62dae367386d8b11ca9fb67479b4cf07cad2c0d6ec3e3a03a657
+      packet_filter.log: 8fe84790160a86931cb5327643eb67d52a373f20c7ad91d75577f63810cc7132
+      reporter.log: 7ca1ee91202eb1109fd37cd23ae3729a27c8e2434d966926a5194826b149e6b1
+      snmp.log: bc6364eb6660061eedba91aa6ab42f666ad093067d2f0aef3fde2dc3954144c4
+      ssh.log: 9742e8157662433fc68e019fb9455a6dff86956a4d2483a6da1640302ecc036b
+      ssl.log: 42b634bed2f110b8d853290e748f389dc488215a383bce42cd3977e80d5faa19
+      weird.log: 5b261b877fb89485e2ee53a643ccf801f2944f54cf2046d41425c343c0c77c20
+      x509.log: e1c9dd446e0aa371e63e3e3d51ba3fcf9bcc1fe3c14d7382365b6358dd9f5969

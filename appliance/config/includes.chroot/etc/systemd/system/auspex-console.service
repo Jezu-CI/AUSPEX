@@ -1,0 +1,17 @@
+[Unit]
+Description=Auspex : console locale (état et configuration)
+After=auspex-config.service systemd-user-sessions.service
+Conflicts=getty@tty1.service
+
+[Service]
+ExecStart=/usr/local/sbin/auspex-console
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

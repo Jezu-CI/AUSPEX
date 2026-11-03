@@ -1,0 +1,29 @@
+Auspex — CMDB passive IT/OT
+https://github.com/Jezu-CI/AUSPEX
+
+Copyright (C) 2026 Yann Mathon et les contributeurs d'Auspex
+
+Concept, conception fonctionnelle et direction du projet : Yann Mathon.
+Code développé avec l'assistance de Claude (Anthropic).
+
+Ce programme est un logiciel libre : vous pouvez le redistribuer et/ou le
+modifier selon les termes de la GNU Affero General Public License version 3
+(fichier LICENSE), complétée par le terme additionnel ci-dessous.
+
+Terme additionnel (article 7, alinéa b, de l'AGPL v3)
+-----------------------------------------------------
+Toute copie, distribution ou version modifiée d'Auspex, y compris lorsqu'elle
+est mise à la disposition d'utilisateurs à travers un réseau, doit conserver
+de façon raisonnablement visible la mention d'attribution suivante :
+
+    Basé sur Auspex, projet conçu par Yann Mathon
+    https://github.com/Jezu-CI/AUSPEX
+
+— dans le fichier NOTICE de toute distribution ;
+— dans une interface interactive, à l'endroit où figurent les mentions
+  légales ou « À propos » (à défaut, sur le tableau de bord), comme le fait
+  le widget « État du service » d'Auspex.
+
+Ce fichier NOTICE doit accompagner toute distribution, modifiée ou non.
+
+Composants tiers : voir THIRD-PARTY.md (chacun reste sous sa propre licence).

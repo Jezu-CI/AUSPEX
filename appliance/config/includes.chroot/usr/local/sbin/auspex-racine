@@ -1,0 +1,72 @@
+#!/bin/bash
+# Racine de l'analyse : image d'usine (ISO) ou emplacement de mise à jour.
+#
+# Au démarrage et à chaque bascule (auspex-maj) :
+#   - une mise à jour restée « à l'essai » (redémarrage pendant l'essai) est
+#     abandonnée : retour à la version précédente ;
+#   - l'emplacement actif est revérifié (signature, empreinte de l'image) et
+#     doit être plus récent que l'ISO, sinon l'image d'usine est utilisée ;
+#   - montage en lecture seule sur /run/auspex/racine (racine du service
+#     auspex-capteur), variables de l'image dans /run/auspex/racine.env.
+set -euo pipefail
+. /usr/local/lib/auspex/lib.sh
+. /usr/local/lib/auspex/maj.sh
+trap 'msg "ERREUR $(basename "$0") ligne $LINENO : $BASH_COMMAND"' ERR
+ROOT="$RUN/racine"
+mkdir -p "$RUN" "$ROOT"
+
+etat_lire
+if [ "${1:-}" = "--demarrage" ] && [ "${E[essai]}" = 1 ]; then
+    v=$(slot_version "${E[actif]}")
+    msg "mise à jour ${v:-?} interrompue pendant l'essai (redémarrage) : abandonnée"
+    refuser "${v:-0}"
+    E[actif]="${E[precedent]}"; E[precedent]=usine; E[essai]=0
+    etat_ecrire
+fi
+
+slot="${E[actif]}"
+usine=$(usine_version)
+if [ "$slot" != usine ]; then
+    load_conf >/dev/null 2>&1 || true
+    pem="$RUN/maj.pem"
+    if ! maj_pem "${C[MAJ_CLE]:-}" "$pem"; then
+        msg "emplacement $slot ignoré : MAJ_CLE absente de capteur.conf ; image d'usine $usine"
+        slot=usine
+    elif ! maj_verifier "$MAJ/$slot" "$pem" image; then
+        msg "emplacement $slot ignoré : $MAJ_RAISON ; image d'usine $usine"
+        slot=usine
+    elif ! version_gt "${M[version]}" "$usine"; then
+        msg "emplacement $slot (${M[version]}) pas plus récent que l'ISO ($usine) : image d'usine"
+        slot=usine
+    fi
+fi
+
+if mountpoint -q "$ROOT"; then umount "$ROOT" 2>/dev/null || umount -l "$ROOT"; fi
+if [ "$slot" = usine ]; then
+    mount --bind "$USINE" "$ROOT"
+    mount -o remount,bind,ro,nodev,nosuid "$ROOT"
+else
+    mount -t squashfs -o ro,loop,nodev,nosuid "$MAJ/$slot/image.squashfs" "$ROOT"
+fi
+# Image utilisable : points de montage du service présents (racine en lecture seule).
+manque=""
+for d in logs etc/auspex-capteur tmp run proc sys dev opt/auspex; do
+    [ -d "$ROOT/$d" ] || manque="$manque /$d"
+done
+if [ -n "$manque" ] && [ "$slot" != usine ]; then
+    msg "emplacement $slot ignoré : image incomplète (manque$manque) ; image d'usine $usine"
+    umount "$ROOT"
+    slot=usine
+    mount --bind "$USINE" "$ROOT"
+    mount -o remount,bind,ro,nodev,nosuid "$ROOT"
+elif [ -n "$manque" ]; then
+    msg "ERREUR : image d'usine incomplète (manque$manque)"
+fi
+if [ -f "$ROOT/.auspex/sensor.env" ]; then
+    grep -E '^(PATH|ZEEK[A-Z_]*|LANG)=[A-Za-z0-9_./:@=+-]*$' "$ROOT/.auspex/sensor.env" > "$RUN/racine.env" || true
+else
+    : > "$RUN/racine.env"
+fi
+version=$(slot_version "$slot")
+echo "$slot $version" > "$RUN/analyse"
+msg "analyse : version $version ($( [ "$slot" = usine ] && echo "image d'usine" || echo "emplacement $slot"))"

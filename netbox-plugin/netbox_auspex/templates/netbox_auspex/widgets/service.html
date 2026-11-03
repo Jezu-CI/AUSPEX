@@ -1,0 +1,15 @@
+{% include "netbox_auspex/widgets/_freshness.html" %}
+{% if snapshot %}
+<div class="d-flex align-items-center gap-2 mb-2" id="auspex-service-state">
+  {% if service.ok %}<span class="badge text-bg-green">en service</span>{% else %}<span class="badge text-bg-red">en erreur</span>{% endif %}
+  <small class="text-muted">dernier cycle : {{ service.finished|slice:":16"|default:"—" }} UTC</small>
+</div>
+{% if not service.ok and service.error %}<p class="small text-danger mb-2">{{ service.error }}</p>{% endif %}
+<table class="table table-sm mb-0">
+  <tr><th class="fw-normal text-muted">Lus au dernier cycle</th><td class="text-end">{{ service.records|default:"0" }}</td></tr>
+  <tr><th class="fw-normal text-muted">Envois SIEM en échec</th><td class="text-end">{% if service.delivery_errors %}<span class="text-danger">{{ service.delivery_errors }}</span>{% else %}0{% endif %}</td></tr>
+  <tr><th class="fw-normal text-muted">Alertes en attente d'envoi</th><td class="text-end">{% if service.outbox_pending %}<span class="text-warning">{{ service.outbox_pending }}</span>{% else %}0{% endif %}</td></tr>
+  <tr><th class="fw-normal text-muted">Règles de flux</th><td class="text-end">{{ rules.total|default:"0" }}{% if rules.expired %} · <span class="text-danger">{{ rules.expired }} expirée(s)</span>{% endif %}{% if rules.expiring_7d %} · <span class="text-warning">{{ rules.expiring_7d }} expire(nt) sous 7 j</span>{% endif %}</td></tr>
+</table>
+{% endif %}
+{% include "netbox_auspex/widgets/_attribution.html" %}

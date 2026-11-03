@@ -1,0 +1,72 @@
+# Identifications attendues sur les captures réelles (tools/captures_reelles.py rapport).
+# Chaque valeur doit figurer (sous-chaîne, sans casse) dans l'attribut de l'actif ;
+# « !valeur » : ne doit PAS y figurer (faux positif corrigé, à ne pas réintroduire).
+#
+# Vérité terrain : ce que l'équipement dit de lui-même dans la capture (sysDescr SNMP,
+# certificat, bannière, identité CIP / S7), recoupé quand c'est possible.
+
+captures:
+  # Lab 4SICS 2015 (Stockholm), logs Zeek d'origine
+  4sics-151021-logs:
+    192.168.88.60: { vendor: Moxa, role: Modbus }                 # certificat et bannière SSH Moxa
+    192.168.88.61: { vendor: Moxa }
+    192.168.88.75: { vendor: Hirschmann, model: Eagle, os_family: VxWorks }   # certificat EAGLE, IPSSH
+    192.168.88.95: { vendor: RUGGEDCOM, role: [Modbus, DNP3] }    # certificat Ruggedcom
+    192.168.88.115: { vendor: Digi, model: Digi CM }              # certificat « Digi CM »
+    10.10.10.10: { device_type: Automate, role: "!Balayage" }     # automate S7, capture asymétrique
+    192.168.2.42: { role: [Nmap, Balayage] }
+    192.168.2.53: { role: [Balayage, "!DNP3"] }                   # balayage, pas un maître DNP3
+    192.168.2.64: { role: [Balayage, "!DNP3"] }
+    192.168.2.88: { role: [Balayage, "!DNP3"] }
+    192.168.2.111: { role: [Balayage, "!DNP3"] }
+  4sics-151022-logs:
+    192.168.88.30:                                                # sysDescr SNMP de l'automate
+      vendor: Siemens
+      model: [CPU-1200, 6ES7 212-1BD30-0XB0]
+      firmware: V1.0.1
+      device_type: Automate
+    192.168.2.166: { os_version: Windows 7, role: Nmap }
+
+  # Captures de protocoles (vrai capteur : Zeek 9 + ICSNPP)
+  4sics-20oct:
+    10.10.10.10: { vendor: Siemens, role: [S7comm, "!Balayage"] }
+    10.10.10.20: { role: IHM }                                   # lit / écrit des variables S7
+  s7-etat-automate:
+    192.168.1.40: { vendor: Siemens, role: S7comm }
+  s7-liste-blocs:
+    192.168.1.10: { role: "Station d'ingénierie" }               # liste et lit les blocs de l'automate
+    192.168.1.40: { vendor: Siemens }
+  s7-1200-ihm:
+    192.168.25.131: { vendor: Siemens, role: S7comm-plus }
+  s7-1500-opc:
+    192.168.25.139: { vendor: Siemens, role: S7comm-plus }
+  modbus:
+    192.168.110.138: { role: Esclave Modbus }
+    192.168.110.131: { role: Maître Modbus }
+  modbus-donnees-2:
+    192.168.66.235: { role: "Station d'ingénierie" }             # fonctions de programmation Concept
+  dnp3-donnees-1:
+    10.0.0.3: { role: outstation }
+    10.0.0.8: { role: Maître DNP3 }
+  iec104:
+    10.20.100.108: { role: IEC 60870-5-104 }
+  bacnet-bbmd:
+    192.168.0.18: { vendor: Alerton }                            # I-Am : fabricant annoncé
+    192.168.0.255: absent                                        # diffusion
+  bacnet-ip-mstp:
+    192.168.0.24: { model: GNU Demo, firmware: 0.4.1 }           # propriétés lues
+  niagara-plugfest:
+    172.16.36.205: { vendor: Tridium, model: NiagaraAX Station, firmware: 3.6.38 }
+    172.16.36.1: { model: NiagaraAX BACnet Advanced Workstation }
+    172.16.36.207: { role: Routeur ou passerelle BACnet }         # annonce des équipements Tridium et Watt Stopper
+    172.16.255.255: absent                                       # diffusion Who-Is, pas un équipement
+  niagara-jace:
+    192.168.1.1: { os_family: VxWorks }                          # en-tête Server « VxWorks/5.4.2 »
+  hart-ip:
+    192.168.0.10: { model: WIRELESSGATEWAY, role: HART-IP }
+    192.168.0.101: { model: "!WIRELESSGATEWAY" }                 # le client n'est pas la passerelle
+  omron-fins:
+    10.130.130.130: { vendor: Omron, device_type: Automate }
+    10.4.14.102: { role: "Station d'ingénierie" }                # Run / fichiers / carte mémoire
+  enip-talabor:
+    192.168.0.101: { vendor: Rockwell }                          # préfixe MAC

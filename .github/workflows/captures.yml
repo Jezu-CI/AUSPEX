@@ -1,0 +1,46 @@
+# Captures d'écran des écrans d'Auspex sur un central réel (à lancer à la main).
+# Les images sont publiées sur la branche « captures » (remplacée à chaque fois).
+name: Captures d'écran
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  captures:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      A: docker compose exec -T auspex auspex -c /etc/auspex/auspex.yaml
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Données de démonstration
+        run: |
+          python examples/demo/generate_logs.py deploy/logs
+          mkdir -p deploy/config
+          cp examples/demo/regles-flux.csv deploy/config/regles-flux.csv
+      - name: Installation du central
+        working-directory: deploy
+        env:
+          AUSPEX_INTERVAL: "20"
+        run: |
+          ./install.sh
+          for i in $(seq 1 60); do $A health && break; sleep 10; done
+      - name: Messagerie de test, navigateur
+        run: |
+          docker run -d --name mailpit --network auspex_default -p 127.0.0.1:8025:8025 axllent/mailpit:latest
+          echo "127.0.0.1 sso.ville.test" | sudo tee -a /etc/hosts
+          pip install -q pyyaml playwright
+          python -m playwright install --with-deps chromium >/dev/null
+      - name: Captures
+        working-directory: deploy
+        run: python ../tools/captures.py
+      - name: Publication sur la branche « captures »
+        working-directory: deploy/captures
+        run: |
+          git init -q -b captures
+          git add .
+          git -c user.name="auspex-ci" -c user.email="ci@auspex.invalid" commit -qm "Captures d'écran ($GITHUB_SHA)"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" captures

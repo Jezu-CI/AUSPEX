@@ -1,0 +1,18 @@
+#!/bin/sh
+# Commande imposée pour chaque clé de capteur (voir authorized_keys) :
+#   - envoi des logs : rsync en écriture seule, sans suppression, liens
+#     symboliques neutralisés, dans le seul dossier du capteur ;
+#   - mises à jour : rsync en lecture seule de la publication signée
+#     (/mises-a-jour, monté en lecture seule).
+set -eu
+name="${1:-}"
+case "$name" in
+    ''|-*|*[!a-z0-9-]*) echo "auspex : capteur invalide" >&2; exit 1 ;;
+esac
+case "${SSH_ORIGINAL_COMMAND:-}" in
+    "rsync --server --sender "*)
+        exec /usr/bin/rrsync -ro /mises-a-jour ;;
+esac
+dest="/logs/$name"
+mkdir -p "$dest"
+exec /usr/bin/rrsync -wo -no-del -munge "$dest"

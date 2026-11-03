@@ -1,0 +1,46 @@
+{% extends 'base/layout.html' %}
+{% block title %}Écarts de conformité{% endblock %}
+{% block content %}
+{% include "netbox_auspex/widgets/_freshness.html" %}
+<form method="get" class="row g-2 mb-3" id="auspex-filters">
+  <div class="col-auto"><select name="gravite" class="form-select form-select-sm" aria-label="Gravité">
+    <option value="">Toutes gravités</option>
+    {% for key, label in severities %}<option value="{{ key }}"{% if filters.gravite == key %} selected{% endif %}>{{ label }} et plus grave</option>{% endfor %}
+  </select></div>
+  <div class="col-auto"><select name="type" class="form-select form-select-sm" aria-label="Origine">
+    <option value="">Flux et inventaire</option>
+    <option value="flux"{% if filters.type == "flux" %} selected{% endif %}>Flux</option>
+    <option value="inventaire"{% if filters.type == "inventaire" %} selected{% endif %}>Inventaire</option>
+  </select></div>
+  <div class="col-auto"><select name="zone" class="form-select form-select-sm" aria-label="Zone">
+    <option value="">Toutes zones</option>
+    {% for z in zones %}<option value="{{ z }}"{% if filters.zone == z %} selected{% endif %}>{{ z }}</option>{% endfor %}
+  </select></div>
+  <div class="col-auto"><input type="search" name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="Rechercher (IP, port, règle…)" aria-label="Rechercher"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-primary" type="submit">Filtrer</button></div>
+</form>
+<div class="card">
+  <div class="card-header">{{ findings|length }} écart(s){% if total != findings|length %} sur {{ total }}{% endif %}{% if truncated %} — liste limitée aux plus graves{% endif %}</div>
+  <div class="table-responsive">
+  <table class="table table-hover mb-0" id="auspex-findings">
+    <thead><tr><th>Gravité</th><th style="min-width:15rem">Écart</th><th>Flux / actif</th><th>Port</th><th>Ouvert le</th><th>Dernier passage</th><th>Références</th></tr></thead>
+    <tbody>
+    {% for f in findings %}
+      <tr>
+        <td><span class="badge text-bg-{{ f.severity_color }}">{{ f.severity_label }}</span></td>
+        <td>{{ f.title }}{% if not f.path %}<div class="small text-muted">{{ f.message }}</div>{% endif %}</td>
+        <td class="text-nowrap">{{ f.path|default:"—" }}</td>
+        <td class="text-nowrap">{{ f.port_label|default:"—" }}</td>
+        <td class="text-nowrap">{{ f.opened_at|slice:":10" }}</td>
+        <td class="text-nowrap">{{ f.last_seen|slice:":10"|default:"—" }}</td>
+        <td class="small">{{ f.references|join:", " }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-muted">Aucun écart ouvert pour ces filtres.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% include "netbox_auspex/widgets/_attribution.html" %}
+{% endblock %}

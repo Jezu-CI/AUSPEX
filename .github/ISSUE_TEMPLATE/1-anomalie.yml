@@ -1,0 +1,59 @@
+name: Anomalie
+description: Un comportement incorrect du central, du capteur ou du plugin NetBox
+labels: [anomalie]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler un problème. **Une faille de sécurité ne
+        doit pas être signalée ici** : utiliser le signalement privé (onglet Security).
+        Ne joindre aucune donnée réelle (adresses, noms d'hôtes, captures) de votre réseau.
+  - type: input
+    id: version
+    attributes:
+      label: Version d'Auspex
+      placeholder: "0.1.0 (fichier VERSION ou pied de page NetBox)"
+    validations:
+      required: true
+  - type: dropdown
+    id: composant
+    attributes:
+      label: Composant
+      options:
+        - Central (installation, mise à jour, docker compose)
+        - Plugin NetBox (tableau de bord, carte, écarts)
+        - Identification des actifs
+        - Conformité des flux
+        - Capteur Docker
+        - Appliance capteur (ISO, mises à jour)
+        - Authentification (MFA, clé, carte à puce, LDAPS, OIDC, SAML)
+        - Exports d'audit
+        - Alertes SIEM
+        - Autre
+    validations:
+      required: true
+  - type: textarea
+    id: constat
+    attributes:
+      label: Ce qui se passe
+      description: Messages d'erreur, extrait de journal (anonymisé).
+    validations:
+      required: true
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce qui était attendu
+    validations:
+      required: true
+  - type: textarea
+    id: reproduire
+    attributes:
+      label: Pour reproduire
+      placeholder: |
+        1. …
+        2. …
+  - type: input
+    id: environnement
+    attributes:
+      label: Environnement
+      placeholder: "Debian 12, Docker 27, navigateur…"

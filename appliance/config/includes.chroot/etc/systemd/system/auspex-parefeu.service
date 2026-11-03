@@ -1,0 +1,13 @@
+[Unit]
+Description=Auspex : pare-feu du capteur (sorties vers le central seulement)
+Requires=auspex-config.service
+After=auspex-config.service nftables.service
+Before=auspex-reseau.service systemd-networkd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/auspex-parefeu
+
+[Install]
+WantedBy=multi-user.target

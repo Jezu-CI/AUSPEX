@@ -1,0 +1,183 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Double authentification · Auspex</title>
+<style>
+  :root { --bg:#f2f5f5; --card:#fff; --fg:#17242b; --muted:#56676f; --line:#d3dde0; --accent:#12805a; --on-accent:#fff; --bad:#b42318; --code:#eaf2ef; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#11181b; --card:#172024; --fg:#e3ece8; --muted:#93a7a0; --line:#2a373d; --accent:#3ddc84; --on-accent:#0b1a12; --bad:#ff7b72; --code:#1d272c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;
+         background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { width:100%; max-width:440px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:28px; }
+  h1 { font-size:1.25rem; margin:0 0 4px; }
+  p { margin:8px 0; } .muted { color:var(--muted); font-size:.9rem; }
+  .error { color:var(--bad); font-weight:600; }
+  .secret, .codes { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; background:var(--code);
+                    border-radius:8px; padding:12px; letter-spacing:.06em; word-break:break-all; }
+  .secret { font-size:1.05rem; text-align:center; }
+  .qr { display:flex; justify-content:center; margin:12px 0; } .qr svg { border-radius:8px; max-width:100%; height:auto; }
+  .codes { columns:2; list-style:none; margin:12px 0; } .codes li { padding:2px 0; }
+  label { display:block; margin:16px 0 6px; font-weight:600; }
+  input[type=text].plain { font:1rem system-ui, sans-serif; letter-spacing:normal; text-align:left; }
+  .keys { list-style:none; padding:0; margin:12px 0; } .keys li { padding:8px 0; border-bottom:1px solid var(--line); }
+  form.inline { display:inline; } details.recovery { margin-top:18px; } details.recovery summary { cursor:pointer; color:var(--muted); }
+  button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  input[type=text] { width:100%; font:1.4rem ui-monospace, monospace; letter-spacing:.2em; text-align:center;
+                     padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--fg); }
+  button, .button { display:inline-block; width:100%; margin-top:16px; padding:11px; border:0; border-radius:8px;
+                    background:var(--accent); color:var(--on-accent); font-weight:600; font-size:1rem; text-align:center; text-decoration:none; cursor:pointer; }
+  .button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  .button .sub { display:block; font-weight:400; font-size:.85rem; opacity:.85; }
+  button.link { background:none; color:var(--accent); width:auto; padding:0; margin-top:12px; font-weight:400; text-decoration:underline; }
+  .notice { background:var(--code); border-radius:8px; padding:10px 12px; }
+  a { color:var(--accent); }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:18px; font:700 1.05rem ui-monospace, 'DejaVu Sans Mono', monospace; letter-spacing:.04em; } footer { margin-top:20px; font-size:.85rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<div class="brand"><img src="{% static 'auspex/favicon.svg' %}" alt="" width="28" height="28"><span>auspex</span></div>
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+{% if mode == "ip_refused" %}
+  <h1>Accès refusé</h1>
+  <p id="ip-refused">Accès refusé depuis cette adresse : votre compte n'est pas autorisé à se connecter depuis ce poste ou ce réseau. La tentative a été journalisée.</p>
+  <p class="muted">Si vous devez vous connecter d'ici, demandez à un administrateur d'ajouter cette adresse à vos postes autorisés.</p>
+{% elif mode == "local_refused" %}
+  <h1>Connexion refusée</h1>
+  <p id="local-refused">Les comptes locaux ne servent plus qu'au compte de secours : connectez-vous avec votre compte de l'annuaire.</p>
+  <a class="button" href="{{ login_url }}">Retour à la connexion</a>
+{% elif mode == "sso_refused" %}
+  <h1>Connexion refusée</h1>
+  <p id="sso-refused">Le fournisseur d'identité n'a pas permis l'accès à Auspex pour ce compte. Si vous pensez que c'est une erreur, contactez votre administrateur : l'événement a été journalisé.</p>
+  <a class="button" href="{{ login_url }}">Retour à la connexion</a>
+{% elif mode == "card_refused" %}
+  <h1>Connexion par carte refusée</h1>
+  <p id="card-refused">{{ reason|capfirst }}.</p>
+  <p class="muted">Vérifiez que la carte est insérée et que vous avez choisi le bon certificat ; sinon, contactez votre administrateur : la tentative a été journalisée.</p>
+  <a class="button" href="{{ login_url }}">Retour à la connexion</a>
+{% elif mode == "choose" %}
+  <h1>Activer la double authentification</h1>
+  <p class="muted">Compte {{ username }} : un code sera demandé à chaque connexion. Comment voulez-vous le recevoir ?</p>
+  {% for m in methods %}
+    {% if m == "webauthn" %}<a class="button{% if not forloop.first %} secondary{% endif %}" id="choose-webauthn" href="{{ setup_url }}?method=webauthn&amp;next={{ next|urlencode }}">Clé de sécurité <span class="sub">clé USB FIDO2, Windows Hello, empreinte — le plus sûr</span></a>
+    {% elif m == "totp" %}<a class="button{% if not forloop.first %} secondary{% endif %}" id="choose-totp" href="{{ setup_url }}?method=totp&amp;next={{ next|urlencode }}">Application d'authentification <span class="sub">téléphone ou poste (KeePassXC…)</span></a>
+    {% elif m == "email" %}<a class="button{% if not forloop.first %} secondary{% endif %}" id="choose-email" href="{{ setup_url }}?method=email&amp;next={{ next|urlencode }}">Code par e-mail <span class="sub">envoyé à {{ masked_email }}</span></a>{% endif %}
+  {% endfor %}
+{% elif mode == "setup" %}
+  <h1>Activer la double authentification</h1>
+  <p class="muted">Compte {{ username }} : un code à usage unique sera demandé à chaque connexion.</p>
+  <p>1. Dans votre application d'authentification (Aegis, FreeOTP, Google ou Microsoft Authenticator, KeePassXC…), scannez ce QR code :</p>
+  <div class="qr" id="qr">{{ qr_svg|safe }}</div>
+  <p class="muted">Ou saisissez la clé à la main (type : basé sur le temps, 6 chiffres, 30 s) :</p>
+  <p class="secret" id="secret">{{ secret }}</p>
+  <p class="muted">Sur téléphone : <a href="{{ uri }}">ouvrir directement dans l'application</a>.</p>
+  <form method="post" action="{{ setup_url }}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="code">2. Saisissez le code affiché</label>
+    <input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required autofocus>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <button type="submit">Activer</button>
+  </form>
+{% elif mode == "setup_email" or mode == "verify_email" %}
+  <h1>{% if mode == "setup_email" %}Activer la double authentification{% else %}Code de vérification{% endif %}</h1>
+  <p>Un code à 8 chiffres a été envoyé à <strong>{{ masked_email }}</strong>. Il est valable 10 minutes.</p>
+  <form method="post" action="{% if mode == "setup_email" %}{{ setup_url }}{% else %}{{ mfa_url }}{% endif %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="code">Code reçu{% if mode == "verify_email" %}, ou code de secours{% endif %}</label>
+    <input type="text" id="code" name="code" autocomplete="one-time-code" maxlength="11" required autofocus>
+    {% if error %}<p class="error" role="alert">{{ error }}{% if locked_minutes %} (environ {{ locked_minutes }} min){% endif %}</p>{% endif %}
+    <button type="submit">{% if mode == "setup_email" %}Activer{% else %}Valider{% endif %}</button>
+  </form>
+  <form method="post" action="{% if mode == "setup_email" %}{{ setup_url }}{% else %}{{ mfa_url }}{% endif %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="action" value="resend">
+    <button type="submit" class="link">Renvoyer un code</button>
+  </form>
+{% elif mode == "setup_webauthn" %}
+  <h1>Activer la double authentification</h1>
+  <p class="muted">Compte {{ username }} : votre clé de sécurité sera demandée à chaque connexion.</p>
+  <p>Branchez votre clé USB (ou préparez Windows Hello, l'empreinte…), puis cliquez sur le bouton et touchez la clé quand elle clignote.</p>
+  <form method="post" action="{{ setup_url }}" id="webauthn-form">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="credential" value="">
+    <label for="nom">Nom de la clé (pour la reconnaître)</label>
+    <input type="text" id="nom" name="nom" maxlength="64" value="clé de sécurité" class="plain">
+    <p class="error" id="webauthn-error" role="alert"{% if not error %} hidden{% endif %}>{{ error }}</p>
+    <button type="button" data-webauthn="create" id="webauthn-create">Inscrire ma clé</button>
+  </form>
+  {{ options|json_script:"webauthn-options" }}
+  <script src="{% static 'netbox_auspex/webauthn.js' %}"></script>
+{% elif mode == "verify_webauthn" %}
+  <h1>Clé de sécurité</h1>
+  <p class="muted">Compte {{ username }} : branchez votre clé, cliquez sur le bouton et touchez-la.</p>
+  <form method="post" action="{{ mfa_url }}" id="webauthn-form">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="credential" value="">
+    <p class="error" id="webauthn-error" role="alert"{% if not error %} hidden{% endif %}>{{ error }}{% if locked_minutes %} (environ {{ locked_minutes }} min){% endif %}</p>
+    <button type="button" data-webauthn="get" id="webauthn-get" autofocus>Utiliser ma clé</button>
+  </form>
+  <details class="recovery"><summary>Clé perdue ou oubliée : code de secours</summary>
+  <form method="post" action="{{ mfa_url }}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="code">Code de secours</label>
+    <input type="text" id="code" name="code" autocomplete="one-time-code" maxlength="11" required>
+    <button type="submit" class="secondary">Valider</button>
+  </form>
+  </details>
+  {{ options|json_script:"webauthn-options" }}
+  <script src="{% static 'netbox_auspex/webauthn.js' %}"></script>
+{% elif mode == "keys" %}
+  <h1>Mes clés de sécurité</h1>
+  <p class="muted">Compte {{ username }}. Inscrivez une seconde clé, rangée à part : elle vous servira si la première est perdue.</p>
+  <ul class="keys" id="webauthn-keys">
+  {% for k in keys %}
+    <li><strong>{{ k.name }}</strong><span class="muted"> — inscrite le {{ k.created|date:"d/m/Y" }}{% if k.last_used %}, utilisée le {{ k.last_used|date:"d/m/Y" }}{% endif %}</span>
+      {% if keys|length > 1 %}<form method="post" action="{{ keys_url }}" class="inline">{% csrf_token %}<input type="hidden" name="action" value="retirer"><input type="hidden" name="cle" value="{{ k.pk }}"><button type="submit" class="link">retirer</button></form>{% endif %}</li>
+  {% endfor %}
+  </ul>
+  <form method="post" action="{{ keys_url }}" id="webauthn-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="ajouter">
+    <input type="hidden" name="credential" value="">
+    <label for="nom">Nom de la nouvelle clé</label>
+    <input type="text" id="nom" name="nom" maxlength="64" value="clé de secours" class="plain">
+    <p class="error" id="webauthn-error" role="alert"{% if not error %} hidden{% endif %}>{{ error }}</p>
+    <button type="button" data-webauthn="create" id="webauthn-create">Ajouter une clé</button>
+  </form>
+  <p class="muted"><a href="/">Retour à Auspex</a></p>
+  {{ options|json_script:"webauthn-options" }}
+  <script src="{% static 'netbox_auspex/webauthn.js' %}"></script>
+{% elif mode == "codes" %}
+  <h1>Double authentification activée</h1>
+  <p><strong>Codes de secours</strong> : chacun ne sert qu'une fois, si vous n'avez plus accès à votre clé, votre application ou votre messagerie. Ils ne seront <strong>plus jamais affichés</strong> : notez-les et rangez-les en lieu sûr.</p>
+  <ul class="codes" id="recovery-codes">{% for c in codes %}<li>{{ c }}</li>{% endfor %}</ul>
+  {% if keys_url %}<p class="notice">Conseil : <a href="{{ keys_url }}" id="add-backup-key">inscrivez dès maintenant une seconde clé</a>, rangée à part.</p>{% endif %}
+  <a class="button" href="{{ next }}">J'ai noté mes codes, continuer</a>
+{% else %}
+  <h1>Code de vérification</h1>
+  <p class="muted">Compte {{ username }} : {% if mode == "verify_recovery" %}saisissez un code de secours.{% else %}saisissez le code de votre application, ou un code de secours.{% endif %}</p>
+  <form method="post" action="{{ mfa_url }}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="code">Code</label>
+    <input type="text" id="code" name="code" autocomplete="one-time-code" maxlength="11" required autofocus>
+    {% if error %}<p class="error" role="alert">{{ error }}{% if locked_minutes %} (environ {{ locked_minutes }} min){% endif %}</p>{% endif %}
+    <button type="submit">Valider</button>
+  </form>
+{% endif %}
+{% if can_switch %}<p class="muted"><a href="{{ switch_url }}?next={{ next|urlencode }}">Choisir une autre méthode</a></p>{% endif %}
+  {% if mode != "ip_refused" and mode != "sso_refused" and mode != "local_refused" and mode != "card_refused" %}<footer>Téléphone ou clé perdu, et plus de codes de secours ? Un administrateur peut réinitialiser votre double authentification. · <a href="{{ logout_url }}">Se déconnecter</a></footer>{% endif %}
+</main>
+</body>
+</html>
