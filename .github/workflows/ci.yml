@@ -56,6 +56,11 @@ jobs:
           fi
           from="${BASE:-$BEFORE}"
           if [ -z "$from" ] || ! git cat-file -e "$from^{commit}" 2>/dev/null; then from=HEAD~1; fi
+          if ! git cat-file -e "$from^{commit}" 2>/dev/null; then
+            # Premier commit du dépôt : rien à comparer, tout est vérifié.
+            for k in complet central appliance capteur netbox; do echo "$k=true" >> "$GITHUB_OUTPUT"; done
+            exit 0
+          fi
           files=$(git diff --name-only "$from" HEAD)
           echo "$files" | sed 's/^/  /'
           has() { echo "$files" | grep -Eq "$1" && echo true || echo false; }
