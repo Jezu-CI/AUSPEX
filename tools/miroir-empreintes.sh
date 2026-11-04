@@ -44,8 +44,15 @@ git_() {
 }
 
 git clone -q "$MIROIR_GIT" "$travail/miroir" 2>/dev/null || echec "miroir inaccessible : $MIROIR_GIT"
-# Dépôt encore vide : première branche nommée main.
-git_ rev-parse -q --verify HEAD >/dev/null || git_ symbolic-ref HEAD refs/heads/main
+# Toujours la branche main du miroir, quelle que soit sa branche par défaut ;
+# dépôt encore vide : main sera sa première branche.
+if git_ rev-parse -q --verify refs/remotes/origin/main >/dev/null; then
+  git_ checkout -q -B main refs/remotes/origin/main
+else
+  # Pas encore de main : nouvelle branche, sans le contenu d'une autre branche.
+  git_ symbolic-ref HEAD refs/heads/main
+  git_ rm -rqf --ignore-unmatch . >/dev/null
+fi
 
 if [ "${MIROIR_ESSAI:-0}" = 1 ]; then
   git_ commit -q --allow-empty -m "Essai d'accès (non envoyé)"

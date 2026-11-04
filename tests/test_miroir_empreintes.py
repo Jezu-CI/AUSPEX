@@ -24,9 +24,14 @@ def _git(*args, cwd=None):
 
 @pytest.fixture
 def miroir(tmp_path):
-    """Dépôt miroir vide (bare) et dossier de version factice."""
+    """Dépôt miroir vide (bare) et dossier de version factice.
+
+    Branche par défaut du dépôt volontairement différente de main (comme
+    « master » sur les machines de GitHub) : le script doit toujours travailler
+    sur main, quelle que soit la branche par défaut du miroir.
+    """
     depot = tmp_path / "miroir.git"
-    _git("init", "-q", "--bare", str(depot))
+    _git("init", "-q", "--bare", "--initial-branch=master", str(depot))
     d = tmp_path / "version"
     d.mkdir()
     (d / "SHA256SUMS").write_text("abc  auspex-sbom.cdx.json\n")
@@ -67,6 +72,21 @@ def test_versions_successives(miroir):
     assert _contenu(depot, "v9.9.9/SHA256SUMS") == "abc  auspex-sbom.cdx.json\n"
     assert _contenu(depot, "v9.9.10/SHA256SUMS") == "def  auspex-sbom.cdx.json\n"
     assert _nb_commits(depot) == 2
+
+
+def test_autre_branche_par_defaut_ignoree(miroir, tmp_path):
+    """Miroir dont la branche par défaut (master) a déjà du contenu : main est créée seule."""
+    depot, d = miroir
+    w = tmp_path / "w"
+    _git("init", "-q", "--initial-branch=master", str(w))
+    (w / "autre.txt").write_text("x\n")
+    _git("add", ".", cwd=w)
+    _git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "a", cwd=w)
+    _git("push", "-q", str(depot), "master", cwd=w)
+    assert _run(depot, d, "v9.9.9").returncode == 0
+    fichiers = _git("--git-dir", str(depot), "ls-tree", "-r", "--name-only", "main").split()
+    assert sorted(fichiers) == ["README.md", "v9.9.9/SHA256SUMS", "v9.9.9/SHA256SUMS.sigstore.json"]
+    assert _nb_commits(depot) == 1
 
 
 def test_version_deja_presente_identique(miroir):
