@@ -193,6 +193,18 @@ def test_workflow():
         assert steps[i]["run"].startswith("tools/miroir-empreintes.sh")
 
 
+@pytest.mark.parametrize("wf", sorted((ROOT / ".github" / "workflows").glob("*.yml")), ids=lambda p: p.name)
+def test_etapes_shell_syntaxe(wf):
+    """Chaque étape « run » des workflows est un script bash syntaxiquement valide (bash -n)."""
+    jobs = yaml.safe_load(wf.read_text(encoding="utf-8"))["jobs"]
+    for job, j in jobs.items():
+        for s in j.get("steps", []):
+            if "run" not in s or s.get("shell", "bash") != "bash":
+                continue
+            r = subprocess.run(["bash", "-n"], input=s["run"], capture_output=True, text=True)
+            assert r.returncode == 0, f"{job} / {s.get('name')} : {r.stderr}"
+
+
 def test_workflow_actions_epinglees():
     """Workflow qui manipule un secret : toutes les actions épinglées sur un commit."""
     text = WF.read_text(encoding="utf-8")

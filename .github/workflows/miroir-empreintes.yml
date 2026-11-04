@@ -47,7 +47,7 @@ jobs:
             echo "::error::version attendue au format vX.Y.Z : $v"; exit 1
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "Version : ${v:-aucune (essai d'accès seulement)}"
+          if [ -n "$v" ]; then echo "Version : $v"; else echo "Aucune version : essai d'accès seulement"; fi
       - name: Accès en écriture au miroir (essai)
         if: steps.v.outputs.version == ''
         env:
