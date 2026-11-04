@@ -65,6 +65,24 @@ seconde, que le fichier téléchargé correspond à son empreinte. Depuis le cod
 source, [`tools/verifier-version.sh`](https://github.com/Jezu-CI/AUSPEX/blob/main/tools/verifier-version.sh)
 fait les deux.
 
+**Recouper hors GitHub.** À la publication de chaque version, `SHA256SUMS` et
+sa signature sont copiés automatiquement dans un miroir hébergé ailleurs que
+sur GitHub : [codeberg.org/Jezu_CI/AUSPEX-empreintes](https://codeberg.org/Jezu_CI/AUSPEX-empreintes),
+un dossier par version, jamais modifié ensuite. Si le compte GitHub du projet
+était compromis, la page de version et ses empreintes pourraient être
+modifiées ensemble ; une différence avec le miroir le révélerait. En donnant
+la version au script, la comparaison est faite en plus :
+
+```bash
+tools/verifier-version.sh DOSSIER v0.2.0
+```
+
+Ou à la main (aucune sortie : identique) :
+
+```bash
+curl -fsSL https://codeberg.org/Jezu_CI/AUSPEX-empreintes/raw/branch/main/v0.2.0/SHA256SUMS | diff - SHA256SUMS
+```
+
 Provenance d'un fichier, avec [GitHub CLI](https://cli.github.com/) :
 
 ```bash

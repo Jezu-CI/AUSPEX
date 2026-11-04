@@ -21,6 +21,7 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 ### Ajouté
 
 - **Versions signées** ([#1](https://github.com/Jezu-CI/AUSPEX/issues/1)) : signature Sigstore sans clé de `SHA256SUMS` (identité du workflow de publication, journal public Rekor) et attestation de provenance SLSA de chaque fichier. Vérification en une commande (`tools/verifier-version.sh`, ou `cosign verify-blob` et `gh attestation verify`), éprouvée à chaque publication, contre-épreuves comprises (fichier, empreintes ou provenance altérés refusés).
+- **Miroir des empreintes hors GitHub** ([#5](https://github.com/Jezu-CI/AUSPEX/issues/5)) : à la publication de chaque version, `SHA256SUMS` et sa signature, vérifiés au préalable, sont copiés dans [codeberg.org/Jezu_CI/AUSPEX-empreintes](https://codeberg.org/Jezu_CI/AUSPEX-empreintes) (un dossier par version, jamais modifié ensuite), puis relus et comparés. `tools/verifier-version.sh DOSSIER vX.Y.Z` compare en plus avec ce miroir, pour recouper si le compte GitHub du projet était compromis.
 
 
 ## [0.1.0] « Silence Before Dawn » — 2026-11-02

@@ -79,6 +79,12 @@ le projet est en 0.x.
   Mises à jour de l'analyse signées par l'organisation, revérifiées à chaque
   démarrage, sans retour en arrière imposé, abandonnées automatiquement en
   cas d'échec.
+- Versions publiées signées (Sigstore, sans clé) avec provenance SLSA ; la
+  liste d'empreintes et sa signature sont aussi copiées, à chaque
+  publication, dans un miroir hors GitHub
+  ([codeberg.org/Jezu_CI/AUSPEX-empreintes](https://codeberg.org/Jezu_CI/AUSPEX-empreintes)),
+  jamais modifié ensuite, pour recouper si le compte GitHub du projet était
+  compromis. Mode d'emploi : [Télécharger → Vérifier](https://jezu-ci.github.io/AUSPEX/telecharger/#v%C3%A9rifier-un-fichier-t%C3%A9l%C3%A9charg%C3%A9).
 
 ## Limites connues
 

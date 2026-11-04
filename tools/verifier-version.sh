@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Vérifie l'origine et l'intégrité des fichiers d'une version d'Auspex.
 #
-#   tools/verifier-version.sh [DOSSIER]      (défaut : dossier courant)
+#   tools/verifier-version.sh [DOSSIER] [VERSION]   (défaut : dossier courant)
 #
 # Le DOSSIER contient SHA256SUMS, SHA256SUMS.sigstore.json et un ou plusieurs
 # fichiers de la version (ceux qui manquent sont ignorés). Prérequis : cosign
@@ -12,23 +12,34 @@
 #    Sigstore émis pour l'identité GitHub Actions, inscrit au journal public
 #    Rekor). Aucune clé à récupérer : l'identité du signataire est vérifiée.
 # 2. Intégrité : chaque fichier présent correspond à son empreinte.
+# 3. Avec VERSION (vX.Y.Z) : SHA256SUMS est identique à la copie du miroir
+#    hors GitHub (Codeberg), pour recouper si le compte GitHub du projet était
+#    compromis. Prérequis supplémentaire : curl.
 #
 # Code de sortie 0 si tout est conforme, 1 sinon.
 set -euo pipefail
 
 DOSSIER="${1:-.}"
+VERSION="${2:-}"
 DEPOT="${AUSPEX_DEPOT:-Jezu-CI/AUSPEX}"
+MIROIR="${AUSPEX_MIROIR_URL:-https://codeberg.org/Jezu_CI/AUSPEX-empreintes/raw/branch/main}"
 IDENTITE="^https://github\.com/${DEPOT//./\\.}/\.github/workflows/version\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$"
 EMETTEUR="https://token.actions.githubusercontent.com"
 
 echec() { echo "ÉCHEC : $*" >&2; exit 1; }
 
 command -v cosign >/dev/null || echec "cosign introuvable (https://docs.sigstore.dev/cosign/system_config/installation/)"
+etapes=2
+if [ -n "$VERSION" ]; then
+  [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || echec "version attendue au format vX.Y.Z : $VERSION"
+  command -v curl >/dev/null || echec "curl introuvable (nécessaire pour comparer avec le miroir)"
+  etapes=3
+fi
 cd "$DOSSIER"
 [ -f SHA256SUMS ] || echec "SHA256SUMS absent de $DOSSIER"
 [ -f SHA256SUMS.sigstore.json ] || echec "SHA256SUMS.sigstore.json absent de $DOSSIER (versions signées : 0.2.0 et suivantes)"
 
-echo "1/2 Origine de SHA256SUMS (signature Sigstore, workflow de publication de $DEPOT)"
+echo "1/$etapes Origine de SHA256SUMS (signature Sigstore, workflow de publication de $DEPOT)"
 cosign verify-blob \
   --bundle SHA256SUMS.sigstore.json \
   --certificate-identity-regexp "$IDENTITE" \
@@ -36,6 +47,16 @@ cosign verify-blob \
   SHA256SUMS >/dev/null 2>&1 || echec "signature de SHA256SUMS invalide ou d'un autre signataire"
 echo "    signature valide"
 
-echo "2/2 Intégrité des fichiers présents"
+echo "2/$etapes Intégrité des fichiers présents"
 sha256sum -c --ignore-missing SHA256SUMS || echec "un fichier ne correspond pas à son empreinte"
+
+if [ -n "$VERSION" ]; then
+  echo "3/3 Comparaison avec le miroir hors GitHub ($MIROIR/$VERSION)"
+  copie=$(mktemp)
+  trap 'rm -f "$copie"' EXIT
+  curl -fsSL "$MIROIR/$VERSION/SHA256SUMS" -o "$copie" 2>/dev/null \
+    || echec "$VERSION absente du miroir ou miroir inaccessible ($MIROIR)"
+  cmp -s SHA256SUMS "$copie" || echec "SHA256SUMS différent de la copie du miroir : ne pas utiliser ces fichiers"
+  echo "    identique au miroir"
+fi
 echo "Version vérifiée : fichiers intègres, publiés par le workflow de $DEPOT."

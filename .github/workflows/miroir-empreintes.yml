@@ -1,0 +1,86 @@
+name: Miroir des empreintes
+
+# À la publication d'une version (brouillon relu puis « Publish release ») :
+# SHA256SUMS et sa signature sont vérifiés comme par un utilisateur, copiés
+# dans un dépôt hors GitHub (Codeberg), puis la copie est relue et comparée.
+# Si le compte GitHub du projet était compromis, la page de version et ses
+# empreintes pourraient être modifiées ensemble : le miroir permet de recouper.
+#
+# Lancement manuel : Actions → « Miroir des empreintes » → Run workflow, avec
+# la version à copier (vX.Y.Z), ou vide pour seulement vérifier que le jeton
+# CODEBERG_TOKEN donne l'accès en écriture au miroir.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à copier (vX.Y.Z) ; vide : vérifier seulement l'accès au miroir"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: miroir-empreintes
+  cancel-in-progress: false
+
+jobs:
+  miroir:
+    name: Miroir
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Version à copier
+        id: v
+        shell: bash
+        env:
+          PUBLIEE: ${{ github.event.release.tag_name }}
+          DEMANDEE: ${{ inputs.version }}
+        run: |
+          v="${PUBLIEE:-$DEMANDEE}"
+          if [ -n "$v" ] && ! [[ "$v" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version attendue au format vX.Y.Z : $v"; exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Version : ${v:-aucune (essai d'accès seulement)}"
+      - name: Accès en écriture au miroir (essai)
+        if: steps.v.outputs.version == ''
+        env:
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+          MIROIR_ESSAI: "1"
+        run: tools/miroir-empreintes.sh
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        if: steps.v.outputs.version != ''
+        with:
+          cosign-release: v3.0.6
+      - name: Empreintes de la version, vérifiées comme par un utilisateur
+        if: steps.v.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          gh release download "$V" -R "$GITHUB_REPOSITORY" -D version \
+            -p SHA256SUMS -p SHA256SUMS.sigstore.json -p auspex-sbom.cdx.json
+          tools/verifier-version.sh version
+      - name: Copie vers le miroir
+        if: steps.v.outputs.version != ''
+        env:
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+          V: ${{ steps.v.outputs.version }}
+        run: tools/miroir-empreintes.sh version "$V"
+      - name: Relecture du miroir, comme un utilisateur
+        if: steps.v.outputs.version != ''
+        env:
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          # Le miroir peut mettre quelques secondes à servir le nouveau fichier.
+          for essai in 1 2 3 4 5 6; do
+            tools/verifier-version.sh version "$V" && exit 0
+            sleep $((essai * 10))
+          done
+          echo "::error::la copie du miroir ne correspond pas aux empreintes de la version"; exit 1
