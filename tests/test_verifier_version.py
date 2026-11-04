@@ -118,7 +118,9 @@ def test_without_cosign(release, tmp_path):
 
 def test_publication_signs_attests_and_proves():
     wf = yaml.safe_load(WF.read_text(encoding="utf-8"))
-    assert wf["permissions"] == {"contents": "write", "id-token": "write", "attestations": "write"}
+    # Lecture seule par défaut ; écriture accordée au seul job de publication.
+    assert wf["permissions"] == {"contents": "read"}
+    assert wf["jobs"]["version"]["permissions"] == {"contents": "write", "id-token": "write", "attestations": "write"}
     steps = wf["jobs"]["version"]["steps"]
     names = [s.get("name") or s.get("uses") for s in steps]
     i_sums = names.index("SBOM, notes et empreintes")

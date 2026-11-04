@@ -40,7 +40,7 @@ jobs:
       capteur: ${{ steps.f.outputs.capteur }}
       netbox: ${{ steps.f.outputs.netbox }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
       - id: f
@@ -81,8 +81,8 @@ jobs:
       matrix:
         python: ${{ needs.changes.outputs.complet == 'true' && fromJSON('["3.10", "3.11", "3.12", "3.13"]') || fromJSON('["3.10", "3.13"]') }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -103,8 +103,8 @@ jobs:
     runs-on: ubuntu-24.04
     needs: tests
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - run: pip install -e .
@@ -132,13 +132,13 @@ jobs:
     runs-on: ubuntu-24.04
     needs: tests
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - run: pip install -e . cyclonedx-bom
       - run: cyclonedx-py environment --of JSON -o sbom.cdx.json
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: sbom
           path: sbom.cdx.json
@@ -149,8 +149,8 @@ jobs:
     needs: [tests, changes]
     if: needs.changes.outputs.capteur == 'true'
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
@@ -177,7 +177,7 @@ jobs:
         run: python tools/ci_annotate.py ci/logs/lab ci/integration.xml
       - name: Publier les logs Zeek
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: zeek-logs
           path: ci/logs
@@ -199,8 +199,8 @@ jobs:
       redis:
         image: redis:7-alpine
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
@@ -250,8 +250,8 @@ jobs:
     env:
       A: docker compose exec -T auspex auspex -c /etc/auspex/auspex.yaml
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - name: Données de démonstration
@@ -505,8 +505,8 @@ jobs:
     env:
       A: docker compose exec -T auspex auspex -c /etc/auspex/auspex.yaml
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - name: Image du capteur et racine de l'appliance
@@ -515,7 +515,7 @@ jobs:
           tools/appliance-rootfs.sh auspex-sensor:ci appliance/out
       - name: Construction de l'ISO (live-build, Debian 12)
         run: |
-          docker run --rm --privileged -v "$PWD:/src" debian:bookworm /src/appliance/build.sh
+          docker run --rm --privileged -v "$PWD:/src" debian:bookworm@sha256:d74df7598108a173a621eda4d58a2adbf850b2d9a9d81bc2cca1a6c21174a880 /src/appliance/build.sh
           sudo chown -R "$(id -u):$(id -g)" appliance/out
           ls -la appliance/out
           echo "::notice title=ISO::$(cd appliance/out && du -h auspex-capteur-*.iso | cut -f1) — $(cat appliance/out/*.sha256)"
@@ -548,7 +548,7 @@ jobs:
           exit $rc
       - name: Console série et captures (diagnostic)
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: appliance-diagnostic
           path: |
@@ -557,7 +557,7 @@ jobs:
             deploy/appliance-ci/qemu.err
           retention-days: 7
       - name: ISO du capteur
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: auspex-capteur-iso
           path: |

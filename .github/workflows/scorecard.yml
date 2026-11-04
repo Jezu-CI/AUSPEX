@@ -1,0 +1,48 @@
+name: OpenSSF Scorecard
+
+# Mesure des bonnes pratiques de sécurité du dépôt (OpenSSF Scorecard) :
+# résultats dans l'onglet Security (Code scanning) et publiés sur
+# scorecard.dev (badge du README). Chaque semaine, à chaque modification de
+# main et à chaque changement des règles de protection des branches.
+#
+# Contraintes de publication imposées par Scorecard : aucune permission
+# d'écriture ni variable au niveau du workflow, et seulement des actions
+# approuvées dans le job (checkout, upload-artifact, upload-sarif, scorecard).
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"
+  branch_protection_rule:
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analyse:
+    name: Scorecard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      security-events: write   # résultats dans l'onglet Security
+      id-token: write          # publication authentifiée sur scorecard.dev
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Analyse
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          publish_results: true
+      - name: Résultats (artefact)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scorecard
+          path: scorecard.sarif
+          retention-days: 7
+      - name: Résultats dans l'onglet Security
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: scorecard.sarif

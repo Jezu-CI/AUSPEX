@@ -6,7 +6,7 @@
 # continue, ils sont envoyés au central (SSH + rsync) si AUSPEX_CENTRAL est
 # défini. Clé du capteur et réglages : /etc/auspex-capteur.
 
-FROM zeek/zeek:lts
+FROM zeek/zeek:lts@sha256:524cb0ce29f26a6a954fb9c357a8f92b95812476d8240f0ece26617ace249dd0
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \

@@ -19,18 +19,20 @@ on:
         default: true
 
 permissions:
-  contents: write
-  id-token: write       # certificat Sigstore éphémère (identité du workflow)
-  attestations: write   # provenance des fichiers
+  contents: read
 
 jobs:
   version:
     name: Version
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write       # brouillon de version
+      id-token: write       # certificat Sigstore éphémère (identité du workflow)
+      attestations: write   # provenance des fichiers
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - name: Version cohérente (code, journal, tag)
@@ -67,7 +69,7 @@ jobs:
         run: |
           docker build -q -t auspex-sensor:version sensor >/dev/null
           tools/appliance-rootfs.sh auspex-sensor:version appliance/out
-          docker run --rm --privileged -v "$PWD:/src" debian:bookworm /src/appliance/build.sh
+          docker run --rm --privileged -v "$PWD:/src" debian:bookworm@sha256:d74df7598108a173a621eda4d58a2adbf850b2d9a9d81bc2cca1a6c21174a880 /src/appliance/build.sh
           sudo chown -R "$(id -u):$(id -g)" appliance/out
       - name: SBOM, notes et empreintes
         env:
@@ -126,7 +128,7 @@ jobs:
           echo "::notice title=Brouillon prêt::Releases → $TAG : relire puis « Publish release »"
       - name: Fichiers de la version (sans brouillon)
         if: steps.v.outputs.publier != 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: version
           path: version/

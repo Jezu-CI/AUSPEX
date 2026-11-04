@@ -1,0 +1,25 @@
+# Mises à jour des dépendances figées (actions sur un commit, images de base
+# sur une empreinte, dépendances Python) : une demande de fusion groupée par
+# écosystème et par semaine, le lundi.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      actions: { patterns: ["*"] }
+    commit-message: { prefix: "Dépendances (actions)" }
+
+  - package-ecosystem: docker
+    directories: [/sensor, /deploy/central, /deploy/reception, /deploy/acces, /deploy/netbox]
+    schedule: { interval: weekly, day: monday }
+    groups:
+      images: { patterns: ["*"] }
+    commit-message: { prefix: "Dépendances (images)" }
+
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      python: { patterns: ["*"] }
+    commit-message: { prefix: "Dépendances (Python)" }

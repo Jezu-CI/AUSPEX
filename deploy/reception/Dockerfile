@@ -5,7 +5,7 @@
 # capteur est cantonné à son dossier par la commande imposée de sa clé
 # (fichier généré par Auspex depuis auspex.yaml).
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 
 ARG UID=10001
 ARG GID=10001
