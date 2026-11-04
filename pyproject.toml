@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,16 +10,16 @@ readme = "README.md"
 license = { text = "AGPL-3.0-only" }
 requires-python = ">=3.10"
 dependencies = [
-    "PyYAML>=6.0",
-    "openpyxl>=3.1",
+    "PyYAML>=6.0.3",
+    "openpyxl>=3.1.5",
     # Signature Ed25519 des exports d'audit
-    "cryptography>=42",
+    "cryptography>=50.0.2",
 ]
 
 [project.optional-dependencies]
 # Django : tests du plugin NetBox (même version majeure que NetBox 4.4)
 # zxing-cpp + numpy : relecture des QR codes générés par un vrai décodeur
-dev = ["pytest>=8", "django>=5.2,<5.3", "zxing-cpp>=2.2", "numpy"]
+dev = ["pytest>=9.2.0", "django>=5.2.18,<5.3", "zxing-cpp>=3.1.1", "numpy"]
 
 [project.scripts]
 auspex = "auspex.cli:main"
