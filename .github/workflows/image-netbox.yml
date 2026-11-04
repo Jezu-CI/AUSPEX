@@ -13,9 +13,14 @@ jobs:
   inventaire:
     runs-on: ubuntu-24.04
     steps:
+      - name: Version demandée
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^v?[0-9]+(\.[0-9]+){0,2}(-[a-z0-9.]+)?$ ]] || { echo "::error::version invalide : $VERSION"; exit 1; }
+          echo "IMG=netboxcommunity/netbox:$VERSION" >> "$GITHUB_ENV"
       - name: Modules présents dans l'image
         run: |
-          IMG="netboxcommunity/netbox:${{ inputs.version }}"
           docker pull -q "$IMG" >/dev/null
           for m in ldap django_auth_ldap social_core.backends.open_id_connect social_core.backends.saml onelogin.saml2 xmlsec jwt cryptography; do
             if docker run --rm --entrypoint /opt/netbox/venv/bin/python "$IMG" -c "import $m" 2>/dev/null; then
@@ -29,7 +34,6 @@ jobs:
           docker run --rm --entrypoint sh "$IMG" -c 'ls -la /opt/netbox/netbox/netbox/ldap_config.py /etc/netbox/config/ 2>&1; dpkg -l | grep -i xmlsec' | sed 's/^/::notice title=fichiers::/'
       - name: Marque et logos (gabarits, fichiers statiques)
         run: |
-          IMG="netboxcommunity/netbox:${{ inputs.version }}"
           note() { printf '::notice title=%s::%s\n' "$1" "$(cat | head -c 3500 | sed ':a;N;$!ba;s/\n/%0A/g')"; }
           run() { docker run --rm --entrypoint sh "$IMG" -c "$1" 2>&1; }
           run 'cd /opt/netbox/netbox && ls static/*.svg static/*.ico static/img 2>/dev/null; find static -maxdepth 2 -iname "*logo*" -o -maxdepth 2 -iname "*icon*.svg" -o -maxdepth 2 -iname "favicon*"' | note "statiques"

@@ -118,12 +118,16 @@ def test_without_cosign(release, tmp_path):
 
 def test_publication_signs_attests_and_proves():
     wf = yaml.safe_load(WF.read_text(encoding="utf-8"))
-    # Lecture seule par défaut ; écriture accordée au seul job de publication.
+    # Lecture seule par défaut ; écriture et signature accordées au seul job « signer ».
     assert wf["permissions"] == {"contents": "read"}
-    assert wf["jobs"]["version"]["permissions"] == {"contents": "write", "id-token": "write", "attestations": "write"}
-    steps = wf["jobs"]["version"]["steps"]
+    assert wf["jobs"]["signer"]["permissions"] == {"contents": "write", "id-token": "write", "attestations": "write"}
+    assert wf["jobs"]["signer"]["needs"] == "construire"
+    build = [s.get("name") or s.get("uses") for s in wf["jobs"]["construire"]["steps"]]
+    assert build.index("Tests") < build.index("SBOM, notes et empreintes") \
+        < build.index("Fichiers construits (transmis au job de signature)")
+    steps = wf["jobs"]["signer"]["steps"]
     names = [s.get("name") or s.get("uses") for s in steps]
-    i_sums = names.index("SBOM, notes et empreintes")
+    i_sums = names.index("Empreintes cohérentes avec les fichiers reçus")
     i_sign = names.index("Signature de SHA256SUMS (Sigstore, sans clé)")
     i_prov = names.index("Provenance des fichiers (SLSA)")
     i_check = names.index("Vérification, comme un utilisateur")
@@ -135,6 +139,29 @@ def test_publication_signs_attests_and_proves():
     assert "provenance acceptée pour un fichier altéré" in check
     assert steps[i_prov]["with"]["subject-checksums"] == "version/SHA256SUMS"
     assert "version/SHA256SUMS*" in steps[i_draft]["run"]
+
+
+def test_signing_isolated_from_build():
+    """Le code du projet et de ses dépendances s'exécute sans droits ; le job qui
+    peut signer au nom du projet et écrire dans le dépôt n'exécute rien d'autre
+    que cosign, l'attestation, gh et le script de vérification."""
+    wf = yaml.safe_load(WF.read_text(encoding="utf-8"))
+    build, sign = wf["jobs"]["construire"], wf["jobs"]["signer"]
+    assert build["permissions"] == {"contents": "read"}
+    sign_runs = "\n".join(s.get("run", "") for s in sign["steps"])
+    for forbidden in ("pip ", "pytest", "python", "docker", "make ", "npm ", "cyclonedx"):
+        assert forbidden not in sign_runs, forbidden
+    sign_uses = [s["uses"].split("@")[0] for s in sign["steps"] if "uses" in s]
+    assert set(sign_uses) <= {"actions/checkout", "actions/download-artifact", "sigstore/cosign-installer",
+                              "actions/attest", "actions/upload-artifact"}, sign_uses
+    # Aucun jeton laissé sur le disque par la récupération du code
+    for job in (build, sign):
+        for s in job["steps"]:
+            if s.get("uses", "").startswith("actions/checkout@"):
+                assert s["with"]["persist-credentials"] is False
+    # Les brouillons ne sont visibles qu'avec le droit d'écriture : contrôle dans « signer »
+    assert "gh release view" not in "\n".join(s.get("run", "") for s in build["steps"])
+    assert any("gh release view" in s.get("run", "") for s in sign["steps"])
 
 
 def test_shellcheck():
@@ -152,7 +179,7 @@ def test_signing_actions_pinned_to_commit():
 
 def test_release_notes_footer_runs(tmp_path):
     """Le pied des notes de version s'exécute tel quel (printf : aucun % hors des %s)."""
-    run = next(s["run"] for s in yaml.safe_load(WF.read_text(encoding="utf-8"))["jobs"]["version"]["steps"]
+    run = next(s["run"] for s in yaml.safe_load(WF.read_text(encoding="utf-8"))["jobs"]["construire"]["steps"]
                if s.get("name") == "SBOM, notes et empreintes")
     lines = [l for l in run.splitlines() if l.startswith(("VERIFIER=", "printf"))]
     assert len(lines) == 2

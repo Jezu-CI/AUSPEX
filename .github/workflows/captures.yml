@@ -15,6 +15,8 @@ jobs:
       A: docker compose exec -T auspex auspex -c /etc/auspex/auspex.yaml
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false   # pas de jeton d'écriture sur le disque pendant pip / playwright
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
@@ -41,8 +43,11 @@ jobs:
         run: python ../tools/captures.py
       - name: Publication sur la branche « captures »
         working-directory: deploy/captures
+        env:
+          GH_TOKEN: ${{ github.token }}   # lu par l'aide d'authentification de gh, jamais dans une commande
         run: |
+          gh auth setup-git
           git init -q -b captures
           git add .
           git -c user.name="auspex-ci" -c user.email="ci@auspex.invalid" commit -qm "Captures d'écran ($GITHUB_SHA)"
-          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" captures
+          git push -qf "https://github.com/${GITHUB_REPOSITORY}.git" captures

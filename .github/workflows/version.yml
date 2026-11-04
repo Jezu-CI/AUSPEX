@@ -5,6 +5,14 @@ name: Publication d'une version
 # altérés refusés), puis version GitHub en BROUILLON (relue et publiée à la main ; le tag vX.Y.Z est créé à la
 # publication, sur le commit construit ici).
 #
+# Deux jobs séparés :
+# - « construire » exécute le code du projet et de ses dépendances (tests,
+#   images, SBOM) SANS aucun droit : ni écriture, ni signature ;
+# - « signer et publier » ne lance que cosign, l'attestation et gh, avec les
+#   droits d'écriture et de signature. Une dépendance compromise qui
+#   s'exécuterait pendant la construction ne peut donc ni signer au nom du
+#   projet, ni écrire dans le dépôt.
+#
 # Deux façons de lancer :
 # - Actions → « Publication d'une version » → Run workflow (publier = oui) ;
 # - pousser un tag vX.Y.Z.
@@ -22,16 +30,20 @@ permissions:
   contents: read
 
 jobs:
-  version:
-    name: Version
+  construire:
+    name: Construire et tester (sans droits)
     runs-on: ubuntu-24.04
     permissions:
-      contents: write       # brouillon de version
-      id-token: write       # certificat Sigstore éphémère (identité du workflow)
-      attestations: write   # provenance des fichiers
+      contents: read
     timeout-minutes: 60
+    outputs:
+      code: ${{ steps.v.outputs.code }}
+      tag: ${{ steps.v.outputs.tag }}
+      publier: ${{ steps.v.outputs.publier }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
@@ -41,7 +53,6 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           PUBLIER: ${{ inputs.publier }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           code=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/auspex/__init__.py)
           tag="v$code"
@@ -54,9 +65,6 @@ jobs:
           fi
           publier=false
           if [ "$EVENT" = push ] || [ "$PUBLIER" = true ]; then publier=true; fi
-          if [ "$publier" = true ] && gh release view "$tag" >/dev/null 2>&1; then
-            echo "::error::la version $tag existe déjà (brouillon ou publiée)"; exit 1
-          fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "publier=$publier" >> "$GITHUB_OUTPUT"
@@ -82,6 +90,48 @@ jobs:
           VERIFIER='https://jezu-ci.github.io/AUSPEX/telecharger/#v%C3%A9rifier-un-fichier-t%C3%A9l%C3%A9charg%C3%A9'
           printf '\n---\nVérifier l'"'"'origine et l'"'"'intégrité des fichiers : [Télécharger → Vérifier](%s). Commit : %s\n' "$VERIFIER" "$GITHUB_SHA" >> version/NOTES.md
           (cd version && sha256sum auspex-* > SHA256SUMS && cat SHA256SUMS)
+      - name: Fichiers construits (transmis au job de signature)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: version-construite
+          path: version/
+          retention-days: 1
+          if-no-files-found: error
+
+  signer:
+    name: Signer et publier
+    needs: construire
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write       # brouillon de version
+      id-token: write       # certificat Sigstore éphémère (identité du workflow)
+      attestations: write   # provenance des fichiers
+    timeout-minutes: 20
+    # Aucune installation ni exécution du code du projet ou de ses dépendances
+    # ici : seulement cosign, l'attestation, gh et le script de vérification.
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/verifier-version.sh
+          sparse-checkout-cone-mode: false
+      - name: Version pas encore publiée
+        if: needs.construire.outputs.publier == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.construire.outputs.tag }}
+        run: |
+          # Les brouillons ne sont visibles qu'avec le droit d'écriture : vérifié ici.
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::la version $TAG existe déjà (brouillon ou publiée)"; exit 1
+          fi
+      - name: Fichiers construits
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: version-construite
+          path: version
+      - name: Empreintes cohérentes avec les fichiers reçus
+        run: (cd version && sha256sum -c SHA256SUMS)
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: v3.0.6
@@ -117,17 +167,17 @@ jobs:
           fi
           echo "Altérations refusées : fichier, liste d'empreintes, provenance"
       - name: Version GitHub (brouillon)
-        if: steps.v.outputs.publier == 'true'
+        if: needs.construire.outputs.publier == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.v.outputs.tag }}
+          TAG: ${{ needs.construire.outputs.tag }}
         run: |
-          gh release create "$TAG" --draft --target "$GITHUB_SHA" \
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
             --title "Auspex $TAG" \
             --notes-file version/NOTES.md version/auspex-* version/SHA256SUMS*
           echo "::notice title=Brouillon prêt::Releases → $TAG : relire puis « Publish release »"
       - name: Fichiers de la version (sans brouillon)
-        if: steps.v.outputs.publier != 'true'
+        if: needs.construire.outputs.publier != 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: version

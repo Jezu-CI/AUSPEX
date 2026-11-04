@@ -49,6 +49,41 @@ def test_docker_run_images_pinned(wf):
             assert m.group(2).startswith("@sha256:"), line.strip()
 
 
+@pytest.mark.parametrize("wf", WORKFLOWS, ids=_ids)
+def test_service_images_pinned(wf):
+    """Conteneurs de service et conteneurs de job des workflows figés par empreinte."""
+    for name, job in yaml.safe_load(wf.read_text(encoding="utf-8"))["jobs"].items():
+        images = [s.get("image") for s in (job.get("services") or {}).values()]
+        c = job.get("container")
+        images.append(c.get("image") if isinstance(c, dict) else c)
+        for image in filter(None, images):
+            assert re.search(r"@sha256:[0-9a-f]{64}$", image), f"{name} : {image}"
+
+
+@pytest.mark.parametrize("wf", WORKFLOWS, ids=_ids)
+def test_no_untrusted_expression_in_scripts(wf):
+    """Injection de workflow : ni données d'événement, ni saisies, ni secrets insérés
+    directement dans un script « run » ; passer par une variable d'environnement."""
+    for name, job in yaml.safe_load(wf.read_text(encoding="utf-8"))["jobs"].items():
+        for s in job.get("steps", []):
+            for expr in re.findall(r"\$\{\{\s*([^}]+?)\s*\}\}", s.get("run", "")):
+                assert not expr.startswith(("github.event", "inputs.", "secrets.", "github.head_ref")), \
+                    f"{name} / {s.get('name')} : {expr}"
+
+
+@pytest.mark.parametrize("wf", WORKFLOWS, ids=_ids)
+def test_write_jobs_keep_no_token_on_disk(wf):
+    """Un job qui peut écrire dans le dépôt ne laisse pas son jeton sur le disque
+    (actions/checkout, persist-credentials: false)."""
+    for name, job in yaml.safe_load(wf.read_text(encoding="utf-8"))["jobs"].items():
+        perms = job.get("permissions") or {}
+        if not isinstance(perms, dict) or perms.get("contents") != "write":
+            continue
+        for s in job.get("steps", []):
+            if s.get("uses", "").startswith("actions/checkout@"):
+                assert (s.get("with") or {}).get("persist-credentials") is False, name
+
+
 @pytest.mark.parametrize("df", DOCKERFILES, ids=_ids)
 def test_dockerfile_base_pinned(df):
     for line in df.read_text(encoding="utf-8").splitlines():
@@ -82,3 +117,4 @@ def test_scorecard_workflow_publishable():
         assert "uses" in s and s["uses"].startswith(approved), s
     scorecard = next(s for s in job["steps"] if s["uses"].startswith("ossf/scorecard-action@"))
     assert scorecard["with"]["publish_results"] is True
+    assert scorecard["with"]["fail_on_publish_error"] is True
