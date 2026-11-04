@@ -10,7 +10,8 @@ Scénario sur 7 jours :
   jamais refermé (flux non déclaré persistant) ;
 - un poste qui fait du RDP vers le contrôleur de domaine (violation du modèle en tiers) ;
 - un serveur qui interroge directement l'automate en Modbus (contournement de la DMZ OT) ;
-- un accès prestataire SSH vers l'atelier couvert par une règle expirée.
+- un accès prestataire SSH vers l'atelier couvert par une règle expirée ;
+- le dernier jour, un poste qui balaie l'atelier (balayage du réseau).
 
 Usage : python generate_logs.py RÉPERTOIRE_DE_SORTIE [--days 7]
 """
@@ -133,6 +134,15 @@ def generate(out: Path, days: int = 7, seed: int = 42) -> None:
 
         # Bruit : scans sans réponse, ne doivent rien inventorier
         w.conn(t(2), PCS[1], "10.1.0.250", 445, state="S0", rb=0)
+
+        # Dernier jour : un poste balaie l'atelier, 120 cibles (adresse et port)
+        # sans réponse. Ajouté en fin de journée : le tirage aléatoire du reste
+        # du scénario est inchangé.
+        if d == days - 1:
+            for i in range(120):
+                w.conn(day + timedelta(hours=22, seconds=i), PCS[1], f"172.16.2.{100 + i % 10}",
+                       (21, 22, 23, 80, 102, 443, 502, 2222, 4840, 20000, 44818, 47808)[i // 10],
+                       state="S0", ob=0, rb=0)
 
     w.flush()
 

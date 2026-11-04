@@ -13,11 +13,17 @@ Deux familles d'écarts :
                                    sensible vers un tier plus sensible (modèle ANSSI)
    - flux_it_vers_ot_direct        flux du SI de gestion vers les niveaux Purdue 0-2
                                    sans passer par la DMZ industrielle (IEC 62443)
+
+3. Comportement :
+   - balayage_reseau               une machine tente de joindre de nombreuses cibles
+                                   (adresse et port) refusées ou sans réponse ; une
+                                   alerte par machine, résolue quand le balayage cesse
 """
 
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
@@ -73,6 +79,10 @@ REFERENCES = {
         "IEC 62443-3-2 (zones et conduits)", "IEC 62443-3-3 SR 5.2",
         "NIS2 CIR 2024/2690 §6.8 (segmentation)",
     ],
+    "balayage_reseau": [
+        "NIS2 CIR 2024/2690 §3.2 (surveillance et journalisation)", "DORA art. 10 (détection)",
+        "IEC 62443-3-3 SR 6.2 (surveillance continue)", "ISO 27001 A.8.16",
+    ],
 }
 
 TITLES = {
@@ -82,6 +92,7 @@ TITLES = {
     "regle_jamais_utilisee": "Règle jamais utilisée",
     "flux_admin_inter_tiers": "Administration depuis un tier moins sensible",
     "flux_it_vers_ot_direct": "Flux IT vers OT sans DMZ industrielle",
+    "balayage_reseau": "Balayage du réseau",
     "actif_inconnu": "Actif observé, absent de la CMDB",
     "actif_silencieux": "Actif déclaré, non observé",
     "identification_divergente": "Identification divergente",
@@ -92,6 +103,11 @@ TITLES = {
 def escalate(severity: str, steps: int = 1) -> str:
     i = min(SEVERITY_ORDER.index(severity) + steps, len(SEVERITY_ORDER) - 1)
     return SEVERITY_ORDER[i]
+
+
+def count_label(finding_type: str, count: int) -> str:
+    """« 3 connexion(s) », ou « 120 cible(s) » pour un balayage."""
+    return f"{count} cible(s)" if finding_type == "balayage_reseau" else f"{count} connexion(s)"
 
 
 def stable_id(*parts) -> str:
@@ -146,6 +162,63 @@ class ComplianceReport:
         for f in self.findings:
             out[f.type] = out.get(f.type, 0) + 1
         return out
+
+
+# Cibles dont le balayage relève la gravité d'un cran : le tier 0, et
+# l'atelier, où un balayage peut suffire à arrêter un automate.
+SCAN_SENSITIVE = {"tier0"} | OT_LOW_CLASSES
+
+
+def _scans(flows: list[Flow], zones: ZoneMap, cfg, now: datetime) -> list[Finding]:
+    """Balayages : par machine source, cibles (adresse, port) jamais jointes,
+    refusées ou sans réponse, dans la fenêtre récente. Une seule alerte par
+    source (identifiant stable) : ouverte pendant le balayage, mise à jour si la
+    gravité change, résolue quand les tentatives sortent de la fenêtre."""
+    if not cfg.enabled:
+        return []
+    since = now - timedelta(hours=cfg.window_hours)
+    by_src: dict[str, list[Flow]] = {}
+    for fl in flows:
+        if fl.count == 0 and fl.attempts_unanswered > 0 and fl.last_seen >= since:
+            by_src.setdefault(fl.src, []).append(fl)
+    out: list[Finding] = []
+    for src, targets in by_src.items():
+        if len(targets) < cfg.min_targets:
+            continue
+        try:
+            addr = ipaddress.ip_address(src)
+        except ValueError:
+            continue
+        if any(addr in net for net in cfg.allowed):
+            continue
+        dst_zones = sorted({zones.name_of(t.dst) for t in targets})
+        sensitive = any(zones.class_of(t.dst) in SCAN_SENSITIVE for t in targets)
+        severity = escalate(cfg.severity) if sensitive else cfg.severity
+        ports: dict[int, int] = {}
+        for t in targets:
+            if t.port is not None:
+                ports[t.port] = ports.get(t.port, 0) + 1
+        top = [str(p) for p, _ in sorted(ports.items(), key=lambda x: (-x[1], x[0]))[:5]]
+        hosts = len({t.dst for t in targets})
+        sz = zones.name_of(src)
+        message = (f"Balayage du réseau depuis {src} ({sz}) : {len(targets)} cibles (adresse et port) "
+                   f"refusées ou sans réponse en {cfg.window_hours} h, sur {hosts} machine(s) ; "
+                   f"zones visées : {', '.join(dst_zones)}")
+        if top:
+            message += f" ; ports les plus visés : {', '.join(top)}"
+        if sensitive:
+            message += " ; cibles sensibles (tier 0 ou atelier)"
+        out.append(Finding(
+            id=stable_id("balayage_reseau", src), type="balayage_reseau", severity=severity,
+            message=message, src=src, src_zone=sz, dst_zone=", ".join(dst_zones), proto="tcp",
+            # Début borné à la fenêtre : une cible tentée de longue date ne fait
+            # pas remonter le balayage au-delà de ce qui a été compté.
+            first_seen=max(since, min(t.first_seen for t in targets)).isoformat(),
+            last_seen=max(t.last_seen for t in targets).isoformat(),
+            count=len(targets),   # cibles (adresse et port) dans la fenêtre
+            references=REFERENCES["balayage_reseau"],
+        ))
+    return out
 
 
 def evaluate(flows: list[Flow], rules: list[FlowRule], zones: ZoneMap,
@@ -244,6 +317,8 @@ def evaluate(flows: list[Flow], rules: list[FlowRule], zones: ZoneMap,
                 message=f"Nouveau flux non déclaré : {label}",
                 references=REFERENCES["nouveau_flux_non_declare"], **common,
             ))
+
+    findings.extend(_scans(flows, zones, alerts_cfg.scan, now))
 
     # --- Règles jamais utilisées : seulement si la fenêtre est assez longue ---
     if window_start and window_end:

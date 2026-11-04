@@ -49,7 +49,35 @@ au moins un préfixe ; une adresse appartient au préfixe le plus spécifique.
 | `persistent_after_days` | `3` | un flux non déclaré devient persistant |
 | `unused_rule_after_days` | `90` | fenêtre minimale avant de signaler une règle inutilisée |
 | `check_intra_zone` | `false` | exiger aussi des règles à l'intérieur des zones |
+| `scan` | — | alerte « balayage du réseau », voir ci-dessous |
 | `outputs[]` | — | sorties SIEM, voir ci-dessous |
+
+#### Balayages du réseau (`alerts.scan`)
+
+Une machine qui tente de joindre de nombreuses cibles (adresse et port)
+**refusées ou sans réponse** déclenche une alerte « Balayage du réseau » :
+une seule par machine, ouverte pendant le balayage, mise à jour si la gravité
+change, résolue d'elle-même quand le balayage cesse (plus de tentative dans la
+fenêtre). Le message indique le nombre de cibles et de machines visées, les
+zones et les ports les plus visés.
+
+| Clé | Défaut | Rôle |
+| --- | --- | --- |
+| `enabled` | `true` | `false` : aucune alerte de balayage |
+| `min_targets` | `100` | nombre de cibles distinctes à partir duquel on parle de balayage (même seuil que le rôle « Balayage de ports » de l'inventaire) |
+| `window_hours` | `24` | seules les tentatives de cette fenêtre comptent |
+| `severity` | `high` | gravité ; relevée d'un cran si le tier 0 ou l'atelier (Purdue 0 à 2) est visé : un balayage peut suffire à arrêter un automate |
+| `allowed` | `[]` | IP ou préfixes CIDR des scanners autorisés (scanner de vulnérabilités) : aucune alerte |
+
+```yaml
+alerts:
+  scan:
+    allowed: [10.9.0.20/32]   # scanner de vulnérabilités de l'équipe sécurité
+```
+
+Limites : seuls les balayages TCP sont détectés (tentatives refusées, `REJ`,
+ou sans réponse, `S0`) ; un balayage UDP ou ICMP, ou un balayage lent étalé
+au-delà de la fenêtre, ne déclenche pas l'alerte.
 
 Sortie : `type` (`syslog`, `webhook`, `file`), `url`
 (`udp://`, `tcp://`, `tls://` pour syslog ; `https://` obligatoire pour

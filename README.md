@@ -52,6 +52,7 @@ sur les réseaux surveillés. Conçu pour les environnements IT et industriels
   | Règle jamais utilisée | règle candidate au nettoyage |
   | Administration depuis un tier moins sensible | poste T2 en RDP sur un contrôleur de domaine T0 |
   | Flux IT vers OT sans DMZ industrielle | serveur qui interroge un automate en direct |
+  | Balayage du réseau | poste compromis qui balaie l'atelier (une alerte par machine, résolue quand le balayage cesse) |
 
 - **Alertes SIEM** : syslog RFC 5424 (UDP, TCP, TLS avec vérification du
   certificat) en CEF ou JSON, webhook HTTPS, fichier JSONL. Une alerte garde

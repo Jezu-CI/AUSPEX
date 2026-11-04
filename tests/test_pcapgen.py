@@ -69,7 +69,8 @@ def test_lab_capture_is_valid(tmp_path):
             if expected is not None:
                 assert seq == expected, f"trou de séquence dans {key}"
             expected = seq + plen + (1 if flags & 0x03 else 0)  # SYN et FIN consomment 1
-    assert len(streams) == 26  # 13 sessions TCP, chacune dans les deux sens
+    # 13 sessions TCP + 120 tentatives refusées du balayage, chacune dans les deux sens
+    assert len(streams) == 26 + 240
 
 
 def test_modbus_and_enip_payloads():

@@ -139,3 +139,13 @@ def test_compliance_findings(analysis):
     keys = {(f["type"], f["src"], f["dst"], f["port"]) for f in findings}
     assert ("flux_admin_inter_tiers", "10.2.1.13", "10.0.0.5", 3389) in keys
     assert ("flux_it_vers_ot_direct", "10.1.0.30", "172.16.2.10", 502) in keys
+
+
+def test_scan_alert(analysis):
+    """Balayage de la capture (120 cibles refusées) : une alerte, un rôle, aucune cible inventoriée."""
+    scans = [f for f in analysis["report"]["findings_detail"] if f["type"] == "balayage_reseau"]
+    assert [(f["src"], f["count"], f["severity"]) for f in scans] == [("10.2.1.66", 120, "high")]
+    assert "10 machine(s)" in scans[0]["message"]
+    roles = [r["value"] for r in analysis["inv"]["10.2.1.66"]["identification"]["role"]]
+    assert any(r.startswith("Balayage de ports") for r in roles), roles
+    assert not any(f"10.1.0.{200 + i}" in analysis["inv"] for i in range(10))

@@ -35,7 +35,7 @@ def snap(site):
 
 def test_written_by_each_cycle(site):
     s = snap(site)
-    assert s["version"] == 1 and s["service"]["ok"] is True and s["service"]["records"] == 467
+    assert s["version"] == 1 and s["service"]["ok"] is True and s["service"]["records"] == 587  # dont 120 tentatives du balayage
     assert s["service"]["interval"] and s["service"]["finished"]
     # Seul le répertoire « tableau » est destiné à NetBox
     assert snapshot_path(load_config(site / "auspex.yaml").state_dir).parent.name == "tableau"

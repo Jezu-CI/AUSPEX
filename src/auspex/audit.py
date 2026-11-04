@@ -36,7 +36,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import __version__
-from .compliance import SEVERITY_ORDER, TITLES
+from .compliance import SEVERITY_ORDER, TITLES, count_label
 from .config import Config
 from .state import AlertStore, AssetStore, FlowStore
 from .zones import ZoneMap
@@ -60,6 +60,7 @@ UNDECLARED = ("nouveau_flux_non_declare", "flux_non_declare_persistant")
 RULES = ("regle_expiree_utilisee", "regle_jamais_utilisee")
 IT_OT = ("flux_it_vers_ot_direct",)
 ADMIN = ("flux_admin_inter_tiers",)
+SCAN = ("balayage_reseau",)
 
 
 @dataclass(frozen=True)
@@ -93,8 +94,9 @@ FRAMEWORKS: dict[str, Framework] = {f.key: f for f in (
         Control("§12.4", "Inventaire des actifs", INVENTORY, ("inventaire",),
                 "actifs observés rapprochés de la CMDB : absents, silencieux, divergents, fiches incomplètes",
                 "la classification des actifs " + _ORG),
-        Control("§3.2", "Surveillance et journalisation", (), ("surveillance",),
-                "observation continue du trafic réseau entrant et sortant (§3.2.3 a)), alertes vers le SIEM",
+        Control("§3.2", "Surveillance et journalisation", SCAN, ("surveillance",),
+                "observation continue du trafic réseau entrant et sortant (§3.2.3 a)), alertes vers le SIEM, "
+                "dont les balayages du réseau",
                 "les autres journaux (comptes, accès, sauvegardes) et leur conservation " + _ORG),
     )),
     Framework("dora", "DORA", "Règlement (UE) 2022/2554 ; règlement délégué (UE) 2024/1774 (RTS)", (
@@ -119,8 +121,8 @@ FRAMEWORKS: dict[str, Framework] = {f.key: f for f in (
                 "flux observés entre zones, comparés aux conduits autorisés", ""),
         Control("SR 5.2", "Protection des frontières de zone", IT_OT, ("flux",),
                 "flux IT vers OT sans DMZ industrielle (zones et conduits, IEC 62443-3-2)", ""),
-        Control("SR 6.2", "Surveillance continue", (), ("surveillance",),
-                "observation passive et continue du réseau industriel, sans émission", ""),
+        Control("SR 6.2", "Surveillance continue", SCAN, ("surveillance",),
+                "observation passive et continue du réseau industriel, sans émission ; balayages du réseau signalés", ""),
         Control("SR 7.8", "Inventaire des composants du système de commande", INVENTORY, ("inventaire",),
                 "automates et équipements industriels identifiés passivement, rapprochés de la CMDB", ""),
     )),
@@ -131,8 +133,8 @@ FRAMEWORKS: dict[str, Framework] = {f.key: f for f in (
                 "règles de flux en vigueur, expirées encore utilisées, jamais utilisées", ""),
         Control("A.5.9", "Inventaire des informations et autres actifs associés", INVENTORY, ("inventaire",),
                 "actifs observés rapprochés de la CMDB", "les actifs informationnels (non réseau) " + _ORG),
-        Control("A.8.16", "Activités de surveillance", (), ("surveillance",),
-                "surveillance du trafic réseau et alertes vers le SIEM", ""),
+        Control("A.8.16", "Activités de surveillance", SCAN, ("surveillance",),
+                "surveillance du trafic réseau et alertes vers le SIEM, dont les balayages du réseau", ""),
     )),
     Framework("anssi", "ANSSI", "Guides de l'ANSSI (administration sécurisée, cartographie, systèmes industriels)", (
         Control("Administration", "Administration sécurisée (modèle en tiers)", ADMIN, ("flux",),
@@ -342,7 +344,9 @@ def _evaluate(fw: Framework, findings: list[dict], ctx: dict) -> list[dict]:
             status, reason = "ecarts", None
         elif reason:
             status = "non_evalue"
-        elif not c.types:
+        elif not c.types or "surveillance" in c.evidence:
+            # Contrôle de surveillance : la surveillance elle-même est la preuve ;
+            # ses écarts (balayages) ne le font passer en « ecarts » qu'ouverts.
             status = "preuve"
         else:
             status = "aucun_ecart"
@@ -906,7 +910,7 @@ def _findings_table(rows: list[dict], limit: int = 50) -> str:
             first, last = _fmt(f["first_seen"]), _fmt(f.get("last_seen"))
             detail = f"observé le {first}" if first == last or not last else f"observé du {first} au {last}"
             if f.get("count"):
-                detail += f", {f['count']} connexion(s)"
+                detail += f", {count_label(f['type'], f['count'])}"
         else:
             detail = f.get("message") or ""
         out.append(f'<tr><td class="sev {_h(f["severity"])}">{_h(SEV_LABEL.get(f["severity"], f["severity"]))}</td>'

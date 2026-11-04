@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import __codename__, __version__
-from .compliance import SEVERITY_ORDER, Finding, evaluate
+from .compliance import SEVERITY_ORDER, Finding, count_label, evaluate
 from .config import Config, ConfigError, load_config
 from .fingerprint import FingerprintEngine, Normalizer, load_normalizer, load_rules
 from .fingerprint.engine import RuleError, load_oui
@@ -318,7 +318,7 @@ def cmd_findings(args) -> int:
         print(f"\n[{SEV_LABEL[f['severity']]}] {f['title']}  ({f['id']})")
         print(f"  {f['message']}")
         if f.get("first_seen"):
-            print(f"  vu du {f['first_seen'][:16]} au {f['last_seen'][:16]}, {f['count']} connexion(s)")
+            print(f"  vu du {f['first_seen'][:16]} au {f['last_seen'][:16]}, {count_label(f['type'], f['count'])}")
         if f.get("references"):
             print(f"  référentiels : {' ; '.join(f['references'])}")
     return 0

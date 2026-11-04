@@ -45,7 +45,8 @@ def test_daemon_once_without_netbox(site, capsys):
     assert main(["daemon", "--logs", "logs", "--once"]) == 0
     ev = events(capsys)
     cycle = next(e for e in ev if e["event"] == "cycle")
-    assert cycle["ok"] and cycle["analyse"]["records"] == 467 and "netbox" not in cycle
+    # 587 enregistrements, dont les 120 tentatives du balayage de la démonstration
+    assert cycle["ok"] and cycle["analyse"]["records"] == 587 and "netbox" not in cycle
     assert [e["event"] for e in ev] == ["démarrage", "cycle", "arrêt"]
     assert main(["health"]) == 0
 

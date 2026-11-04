@@ -234,6 +234,7 @@ WEB = Host("10.1.0.80", "00:15:5d:01:00:80")
 APP = Host("10.1.0.30", "00:15:5d:01:00:30")
 PC1 = Host("10.2.1.11", "00:15:5d:0a:11:01")
 PC3 = Host("10.2.1.13", "3c:52:82:aa:13:03")
+SCANNER = Host("10.2.1.66", "3c:52:82:aa:66:06")
 BASTION = Host("10.9.0.4", "00:15:5d:09:00:04")
 SCADA = Host("172.16.35.5", "00:15:5d:35:00:05")
 HMI = Host("172.16.2.50", "00:1b:1b:aa:bb:cc")
@@ -285,6 +286,12 @@ def lab_scenario() -> Capture:
 
     # Tentative refusée (scan) : ne doit rien inventorier
     c.tcp_refused(PC3, Host("10.1.0.250", GATEWAY_MAC), 445)
+
+    # Balayage : un poste tente 120 cibles (10 adresses × 12 ports), toutes
+    # refusées ; alerte « balayage du réseau » attendue, cibles non inventoriées
+    for i in range(120):
+        c.tcp_refused(SCANNER, Host(f"10.1.0.{200 + i % 10}", GATEWAY_MAC),
+                      (21, 22, 23, 25, 80, 110, 135, 139, 443, 445, 3389, 8080)[i // 10])
 
     # OT : supervision Modbus depuis la DMZ industrielle
     for tid in (1, 2):

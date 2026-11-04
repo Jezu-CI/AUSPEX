@@ -20,6 +20,12 @@ from typing import Iterator
 # fonctionne, pas qu'un flux existe.
 TCP_ESTABLISHED = {"SF", "S1", "S2", "S3", "RSTO", "RSTR"}
 
+# Tentatives refusées (REJ) ou sans réponse (S0) : la signature d'un balayage.
+# Les autres états non établis apparaissent aussi sur des captures
+# asymétriques (relevé sur captures réelles : un automate y passait pour un
+# scanner) ; ils ne comptent pas pour la détection des balayages.
+TCP_UNANSWERED = {"REJ", "S0"}
+
 
 def _open_bin(path: Path):
     if path.name.endswith(".gz"):
@@ -182,6 +188,7 @@ class Flow:
     bytes: int = 0
     attempts_rejected: int = 0
     services: set[str] = field(default_factory=set)
+    attempts_unanswered: int = 0   # parmi attempts_rejected : REJ ou S0 seulement
 
     @property
     def key(self) -> tuple:
@@ -196,7 +203,7 @@ class Flow:
             "src": self.src, "dst": self.dst, "proto": self.proto, "port": self.port,
             "first_seen": self.first_seen.isoformat(), "last_seen": self.last_seen.isoformat(),
             "count": self.count, "bytes": self.bytes, "attempts_rejected": self.attempts_rejected,
-            "services": sorted(self.services),
+            "attempts_unanswered": self.attempts_unanswered, "services": sorted(self.services),
         }
 
 
@@ -221,6 +228,8 @@ def aggregate_conn(records: Iterator[dict]) -> dict[tuple, Flow]:
         state = rec.get("conn_state", "")
         if proto == "tcp" and state and state not in TCP_ESTABLISHED:
             f.attempts_rejected += 1
+            if state in TCP_UNANSWERED:
+                f.attempts_unanswered += 1
             continue
         f.count += 1
         f.bytes += (_int(rec.get("orig_bytes")) or 0) + (_int(rec.get("resp_bytes")) or 0)

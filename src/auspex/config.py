@@ -73,11 +73,23 @@ class Output:
 
 
 @dataclass
+class ScanConfig:
+    """Alerte « balayage du réseau » : une machine qui tente de joindre de
+    nombreuses cibles (adresse et port) refusées ou sans réponse."""
+    enabled: bool = True
+    min_targets: int = 100       # même seuil que la règle d'identification it-port-scan
+    window_hours: int = 24       # seules les tentatives récentes comptent
+    severity: str = "high"       # relevée d'un cran si le tier 0 ou l'atelier (Purdue 0-2) est visé
+    allowed: tuple[ipaddress._BaseNetwork, ...] = ()   # scanners autorisés : pas d'alerte
+
+
+@dataclass
 class AlertsConfig:
     persistent_after_days: int = 3
     unused_rule_after_days: int = 90
     check_intra_zone: bool = False
     outputs: list[Output] = field(default_factory=list)
+    scan: ScanConfig = field(default_factory=ScanConfig)
 
 
 @dataclass(frozen=True)
@@ -708,6 +720,38 @@ def parse_config(raw: Any, base_dir: Path | str = ".") -> Config:
             problems.append("alerts.check_intra_zone : true ou false attendu")
         else:
             alerts.check_intra_zone = a["check_intra_zone"]
+    sc = a.get("scan")
+    if sc is not None:
+        if not isinstance(sc, dict):
+            problems.append("alerts.scan : dictionnaire attendu")
+        else:
+            unknown = set(sc) - {"enabled", "min_targets", "window_hours", "severity", "allowed"}
+            if unknown:
+                problems.append(f"alerts.scan : clé(s) inconnue(s) {', '.join(sorted(unknown))}")
+            if "enabled" in sc:
+                if not isinstance(sc["enabled"], bool):
+                    problems.append("alerts.scan.enabled : true ou false attendu")
+                else:
+                    alerts.scan.enabled = sc["enabled"]
+            for key, low in (("min_targets", 2), ("window_hours", 1)):
+                if key in sc:
+                    v = sc[key]
+                    if not isinstance(v, int) or isinstance(v, bool) or v < low:
+                        problems.append(f"alerts.scan.{key} : entier ≥ {low} attendu")
+                    else:
+                        setattr(alerts.scan, key, v)
+            if "severity" in sc:
+                if sc["severity"] not in SEVERITIES:
+                    problems.append(f"alerts.scan.severity : '{sc['severity']}' inconnu "
+                                    f"(attendu : {', '.join(SEVERITIES)})")
+                else:
+                    alerts.scan.severity = sc["severity"]
+            allowed = sc.get("allowed") or []
+            if not isinstance(allowed, list):
+                problems.append("alerts.scan.allowed : liste d'IP ou de préfixes CIDR attendue")
+            else:
+                nets = [_net(x, f"alerts.scan.allowed[{i}]", problems) for i, x in enumerate(allowed)]
+                alerts.scan.allowed = tuple(n for n in nets if n is not None)
     for i, o in enumerate(a.get("outputs") or []):
         where = f"alerts.outputs[{i}]"
         if isinstance(o, str):  # forme courte : "syslog://hote:514"

@@ -39,6 +39,9 @@ flow_rules:
 alerts:
   persistent_after_days: 3
   unused_rule_after_days: 90
+  # Balayages du réseau (valeurs par défaut) ; scanners de vulnérabilités
+  # autorisés dans allowed : aucune alerte pour eux.
+  # scan: { min_targets: 100, window_hours: 24, severity: high, allowed: [10.9.0.20/32] }
   outputs:
     - { type: file, path: /var/lib/auspex/alertes.jsonl }
     # - { type: syslog, url: "tls://siem.client.local:6514", format: cef }

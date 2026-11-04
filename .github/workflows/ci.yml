@@ -116,6 +116,14 @@ jobs:
           auspex rules import --apply
           auspex analyze --logs logs --now logs
           auspex findings --min-severity high
+      - name: Balayage de l'atelier signalé (dernier jour du scénario)
+        working-directory: examples/demo
+        run: |
+          auspex findings --json | python -c "
+          import json, sys
+          f = [x for x in json.load(sys.stdin) if x['type'] == 'balayage_reseau']
+          assert [(x['src'], x['severity']) for x in f] == [('10.2.1.12', 'critical')], f
+          print(f[0]['message'])"
       - name: Vérifier les règles d'identification livrées
         run: python -c "from auspex.fingerprint import load_rules; r = load_rules(['rules']); print(len(r), 'règles valides')"
 

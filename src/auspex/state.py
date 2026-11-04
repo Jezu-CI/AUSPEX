@@ -41,7 +41,8 @@ class FlowStore:
         flows = {}
         for d in _read(self.path, []):
             f = Flow(d["src"], d["dst"], d["proto"], d["port"], _dt(d["first_seen"]), _dt(d["last_seen"]),
-                     d["count"], d["bytes"], d.get("attempts_rejected", 0), set(d.get("services", [])))
+                     d["count"], d["bytes"], d.get("attempts_rejected", 0), set(d.get("services", [])),
+                     d.get("attempts_unanswered", 0))
             flows[f.key] = f
         return flows
 
@@ -57,6 +58,7 @@ class FlowStore:
             cur.count += f.count
             cur.bytes += f.bytes
             cur.attempts_rejected += f.attempts_rejected
+            cur.attempts_unanswered += f.attempts_unanswered
             cur.services |= f.services
         return base
 
