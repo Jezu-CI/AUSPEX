@@ -120,3 +120,18 @@ def test_no_exports_yet(audits_dir, admin):
 def test_menu():
     from netbox_auspex.navigation import menu_items
     assert "plugins:netbox_auspex:audits" in [i.link for i in menu_items]
+
+
+@pytest.mark.parametrize("url", ["/plugins/auspex/audits/x&next=https:evil.example",
+                                 "/plugins/auspex/ecarts/", "/plugins/auspex/carte/"])
+def test_login_redirect_encodes_next(audits_dir, url):
+    """Redirection vers la connexion : le chemin demandé est encodé dans « next »,
+    il ne peut pas ajouter un second paramètre (CodeQL py/url-redirection)."""
+    from urllib.parse import parse_qs, unquote, urlsplit
+    r = Client().get(url)
+    assert r.status_code == 302
+    loc = urlsplit(r["Location"])
+    assert loc.path == "/login/" and not loc.netloc
+    q = parse_qs(loc.query)
+    assert list(q) == ["next"] and len(q["next"]) == 1          # un seul paramètre, rien d'ajouté
+    assert unquote(q["next"][0]) == url                          # le chemin demandé, tel quel

@@ -13,9 +13,10 @@ import os
 import threading
 from datetime import datetime, timezone
 
+from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import render
 from django.urls import reverse
 
 from .middleware import get_plugin_config
@@ -105,7 +106,7 @@ def filter_findings(findings: list[dict], severity_min: str | None = None, scope
 
 def findings_view(request):
     if not request.user.is_authenticated:
-        return redirect(f"/login/?next={request.path}")
+        return redirect_to_login(request.get_full_path(), login_url="/login/")  # « next » encodé
     if not allowed(request.user):
         raise PermissionDenied
     snapshot = _snapshot.get()
@@ -125,7 +126,7 @@ def findings_view(request):
 
 def _guard(request):
     if not request.user.is_authenticated:
-        return redirect(f"/login/?next={request.path}")
+        return redirect_to_login(request.get_full_path(), login_url="/login/")  # « next » encodé
     if not allowed(request.user):
         raise PermissionDenied
     return None

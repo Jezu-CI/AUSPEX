@@ -251,3 +251,14 @@ def test_close_gracefully_avoids_reset(graceful):
         assert error is None and received == b"message"
     else:
         assert isinstance(error, ConnectionResetError)  # le défaut corrigé, reproduit
+
+
+def test_tls_contexts_require_tls12_and_verify(tmp_path):
+    """Sorties syslog TLS / webhook et client NetBox : TLS 1.2 minimum exigé explicitement,
+    certificat et nom d'hôte toujours vérifiés (CodeQL py/insecure-protocol)."""
+    import ssl
+    from auspex.netbox import NetBoxClient
+    from auspex.outputs import tls_context
+    for ctx in (tls_context(), NetBoxClient("https://netbox.example", "x" * 40).ctx):
+        assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+        assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname

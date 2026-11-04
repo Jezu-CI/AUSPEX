@@ -90,6 +90,8 @@ class NetBoxClient:
         self.token = token
         self.timeout = timeout
         self.ctx = ssl.create_default_context(cafile=ca_file) if url.startswith("https") else None
+        if self.ctx:
+            self.ctx.minimum_version = ssl.TLSVersion.TLSv1_2   # certificat vérifié, TLS 1.2 minimum
         self._version: tuple[int, int] | None = None
 
     def _auth(self) -> str:

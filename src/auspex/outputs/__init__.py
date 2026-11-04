@@ -101,6 +101,14 @@ class DeliveryError(Exception):
     pass
 
 
+def tls_context(cafile: str | None = None) -> ssl.SSLContext:
+    """Contexte TLS des sorties : certificat toujours vérifié, TLS 1.2 minimum
+    (exigé explicitement, sans dépendre des réglages par défaut du système)."""
+    ctx = ssl.create_default_context(cafile=cafile)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
 def _send_syslog(out: Output, messages: list[str]) -> None:
     u = urlparse(out.url)
     scheme = u.scheme
@@ -114,8 +122,7 @@ def _send_syslog(out: Output, messages: list[str]) -> None:
         raw = socket.create_connection((host, port), timeout=10)
         if scheme == "tls":
             # Vérification du certificat toujours active ; ca_file pour une AC privée.
-            ctx = ssl.create_default_context(cafile=out.ca_file)
-            raw = ctx.wrap_socket(raw, server_hostname=host)
+            raw = tls_context(out.ca_file).wrap_socket(raw, server_hostname=host)
         with raw as s:
             for m in messages:
                 data = m.encode("utf-8")
@@ -155,7 +162,7 @@ def _send_webhook(out: Output, events: list[dict]) -> None:
         headers["Authorization"] = f"Bearer {token}"
     body = json.dumps({"events": events}, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(out.url, data=body, headers=headers, method="POST")
-    ctx = ssl.create_default_context(cafile=out.ca_file) if out.url.startswith("https") else None
+    ctx = tls_context(out.ca_file) if out.url.startswith("https") else None
     try:
         with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
             if resp.status >= 300:
