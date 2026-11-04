@@ -190,3 +190,26 @@ def test_release_notes_footer_runs(tmp_path):
     notes = (tmp_path / "version" / "NOTES.md").read_text(encoding="utf-8")
     assert "(https://jezu-ci.github.io/AUSPEX/telecharger/#v%C3%A9rifier-un-fichier-t%C3%A9l%C3%A9charg%C3%A9)" in notes
     assert "Commit : abc123" in notes and "l'origine et l'intégrité" in notes
+
+
+@pytest.mark.parametrize("event, publier, entete, ok", [
+    ("workflow_dispatch", "false", "## [9.9.9] — en préparation", True),    # essai pendant la préparation
+    ("workflow_dispatch", "true", "## [9.9.9] — en préparation", False),    # vrai brouillon : date exigée
+    ("push", "", "## [9.9.9] — en préparation", False),                     # tag poussé : date exigée
+    ("workflow_dispatch", "true", "## [9.9.9] « Nom » — 2026-12-01", True),
+    ("workflow_dispatch", "false", "## [9.9.8] — 2026-12-01", False),        # pas d'entrée pour la version
+])
+def test_version_check_step(tmp_path, event, publier, entete, ok):
+    """L'étape « Version cohérente » s'exécute telle quelle sur des cas réels."""
+    run = next(s["run"] for s in yaml.safe_load(WF.read_text(encoding="utf-8"))["jobs"]["construire"]["steps"]
+               if s.get("id") == "v")
+    (tmp_path / "src" / "auspex").mkdir(parents=True)
+    (tmp_path / "src" / "auspex" / "__init__.py").write_text('__version__ = "9.9.9"\n')
+    (tmp_path / "CHANGELOG.md").write_text(f"# Journal\n\n{entete}\n\n- quelque chose\n")
+    out = tmp_path / "out"
+    r = subprocess.run(["bash", "-e", "-o", "pipefail", "-c", run], cwd=tmp_path, capture_output=True, text=True,
+                       env={**os.environ, "EVENT": event, "PUBLIER": publier, "GITHUB_REF_NAME": "v9.9.9",
+                            "GITHUB_SHA": "0" * 40, "GITHUB_OUTPUT": str(out)})
+    assert (r.returncode == 0) is ok, r.stdout + r.stderr
+    if ok:
+        assert f"publier={'true' if publier == 'true' or event == 'push' else 'false'}" in out.read_text()

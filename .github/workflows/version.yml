@@ -60,11 +60,13 @@ jobs:
             echo "::error::tag ${GITHUB_REF_NAME} ≠ version du code $tag"; exit 1
           fi
           grep -q "^## \[$code\]" CHANGELOG.md || { echo "::error::CHANGELOG.md sans entrée $code"; exit 1; }
-          if grep "^## \[$code\]" CHANGELOG.md | grep -q "en préparation"; then
-            echo "::error::CHANGELOG.md : remplacer « en préparation » par la date de publication"; exit 1
-          fi
           publier=false
           if [ "$EVENT" = push ] || [ "$PUBLIER" = true ]; then publier=true; fi
+          # Date de publication exigée pour un vrai brouillon seulement : un essai
+          # (publier = non) reste possible pendant la préparation de la version.
+          if [ "$publier" = true ] && grep "^## \[$code\]" CHANGELOG.md | grep -q "en préparation"; then
+            echo "::error::CHANGELOG.md : remplacer « en préparation » par la date de publication"; exit 1
+          fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "publier=$publier" >> "$GITHUB_OUTPUT"
