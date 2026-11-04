@@ -118,3 +118,66 @@ def test_scorecard_workflow_publishable():
     scorecard = next(s for s in job["steps"] if s["uses"].startswith("ossf/scorecard-action@"))
     assert scorecard["with"]["publish_results"] is True
     assert scorecard["with"]["fail_on_publish_error"] is True
+
+
+REQ = ROOT / "requirements"
+LOCKS = sorted(REQ.glob("*.txt"))
+
+
+def _pip_installs():
+    files = WORKFLOWS + DOCKERFILES
+    for f in files:
+        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            for cmd in re.findall(r"pip install[^&;|\n]*", line):
+                yield f, n, cmd
+
+
+def test_every_pip_install_is_pinned():
+    """Pinned-Dependencies : chaque « pip install » vient d'un fichier figé vérifié par
+    empreinte (--require-hashes -r requirements/…), ou installe le projet lui-même
+    sans aller chercher de dépendance (--no-deps)."""
+    seen = 0
+    for f, n, cmd in _pip_installs():
+        seen += 1
+        ok = re.search(r"--require-hashes -r requirements/[a-z]+\.txt\s*$", cmd.strip()) or \
+            re.search(r"--no-deps( -e)? \.\s*$", cmd.strip())
+        assert ok, f"{_ids(f)}:{n} : {cmd}"
+        if "-r requirements/" in cmd:
+            assert (ROOT / re.search(r"requirements/[a-z]+\.txt", cmd).group(0)).exists(), cmd
+    assert seen >= 10
+
+
+@pytest.mark.parametrize("lock", LOCKS, ids=_ids)
+def test_lock_files_fully_hashed(lock):
+    """Chaque paquet figé : version exacte et au moins une empreinte SHA-256 ;
+    fichier régénéré par tools/figer-dependances.sh (en-tête)."""
+    text = lock.read_text(encoding="utf-8")
+    assert "#    tools/figer-dependances.sh" in text
+    entries = re.split(r"\n(?=[a-z0-9])", text.split("\n\n", 1)[-1] if text.startswith("#") else text)
+    pkgs = [e for e in entries if re.match(r"[a-z0-9]", e)]
+    assert pkgs
+    for e in pkgs:
+        head = e.splitlines()[0]
+        assert re.match(r"^[a-z0-9_.-]+==[\w.+-]+( ;.*)? \\$", head), head
+        assert re.search(r"--hash=sha256:[0-9a-f]{64}", e), head
+
+
+def test_central_image_uses_locked_dependencies():
+    df = (ROOT / "deploy" / "central" / "Dockerfile").read_text(encoding="utf-8")
+    assert "--require-hashes -r requirements/execution.txt" in df
+    assert "pip install --no-cache-dir --no-deps ." in df
+    lock = (REQ / "execution.txt").read_text(encoding="utf-8")
+    try:
+        import tomllib
+    except ImportError:          # Python 3.10
+        import tomli as tomllib
+    deps = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["dependencies"]
+    for d in deps:   # chaque dépendance déclarée du produit est figée
+        name = re.match(r"[A-Za-z0-9_.-]+", d).group(0).lower().replace("_", "-")
+        assert re.search(rf"^{re.escape(name)}==", lock, re.M), name
+
+
+def test_dependabot_watches_lock_files():
+    cfg = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))
+    pip = next(u for u in cfg["updates"] if u["package-ecosystem"] == "pip")
+    assert "/requirements" in pip["directories"]

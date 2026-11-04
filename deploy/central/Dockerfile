@@ -10,9 +10,13 @@ RUN apt-get update \
 
 WORKDIR /opt/auspex
 COPY pyproject.toml README.md LICENSE ./
+# Dépendances figées : version exacte et empreinte de chaque paquet vérifiées
+# (requirements/execution.txt, régénéré par tools/figer-dependances.sh).
+COPY requirements/execution.txt ./requirements/execution.txt
+RUN pip install --no-cache-dir --require-hashes -r requirements/execution.txt
 COPY src ./src
 COPY rules ./rules
-RUN pip install --no-cache-dir . && rm -rf /root/.cache
+RUN pip install --no-cache-dir --no-deps . && rm -rf /root/.cache
 
 COPY deploy/central/entrypoint.sh /usr/local/bin/auspex-entrypoint
 RUN chmod 0755 /usr/local/bin/auspex-entrypoint

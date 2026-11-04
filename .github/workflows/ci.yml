@@ -66,7 +66,7 @@ jobs:
           has() { echo "$files" | grep -Eq "$1" && echo true || echo false; }
           {
             echo "complet=false"
-            echo "central=$(has '^(src/|netbox-plugin/|deploy/|tools/ci_|tools/pcapgen|sensor/|pyproject|\.github/workflows/ci)')"
+            echo "central=$(has '^(src/|netbox-plugin/|deploy/|tools/ci_|tools/pcapgen|sensor/|pyproject|requirements/|\.github/workflows/ci)')"
             echo "appliance=$(has '^(appliance/|sensor/|deploy/reception/|deploy/docker-compose|src/auspex/(maj|reception|zeek|cli)\.py|tools/(ci_appliance|appliance-rootfs|pcapgen)|\.github/workflows/ci)')"
             echo "capteur=$(has '^(sensor/|tools/pcapgen|tests/integration/|rules/|\.github/workflows/ci)')"
             echo "netbox=$(has '^(src/auspex/netbox|tests/integration/|\.github/workflows/ci)')"
@@ -87,7 +87,7 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       - name: Installation
-        run: pip install -e ".[dev]"
+        run: pip install --require-hashes -r requirements/dev.txt && pip install --no-deps -e .
       - name: Tests unitaires et de bout en bout
         shell: bash
         run: |
@@ -107,7 +107,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install -e .
+      - run: pip install --require-hashes -r requirements/execution.txt && pip install --no-deps -e .
       - name: Rejouer le scénario IT/OT
         working-directory: examples/demo
         run: |
@@ -136,7 +136,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install -e . cyclonedx-bom
+      - run: pip install --require-hashes -r requirements/sbom.txt && pip install --no-deps -e .
       - run: cyclonedx-py environment --of JSON -o sbom.cdx.json
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
@@ -153,7 +153,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]"
+      - run: pip install --require-hashes -r requirements/dev.txt && pip install --no-deps -e .
       - name: Construire l'image capteur
         run: docker build -t auspex-sensor:ci sensor
       - name: Versions embarquées
@@ -203,7 +203,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]"
+      - run: pip install --require-hashes -r requirements/dev.txt && pip install --no-deps -e .
       - name: Démarrer NetBox
         run: |
           docker run -d --name netbox --network ${{ job.services.postgres.network }} -p 8080:8080 \
@@ -348,7 +348,7 @@ jobs:
       - name: Trusted hosts — user1 refusé hors de ses deux adresses
         working-directory: deploy
         run: |
-          pip install -q pyyaml
+          pip install -q --require-hashes -r requirements/execution.txt
           python ../tools/ci_trusted_hosts.py
           $A health
       - name: Double authentification (application et e-mail) des comptes locaux
@@ -426,7 +426,7 @@ jobs:
         working-directory: deploy
         shell: bash
         run: |
-          pip install -q playwright
+          pip install -q --require-hashes -r requirements/captures.txt
           python -m playwright install --with-deps chromium >/dev/null
           set +e
           python ../tools/ci_webauthn.py > webauthn.log 2>&1
@@ -530,7 +530,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-x86 qemu-utils mtools dosfstools tcpreplay squashfs-tools >/dev/null
-          pip install -q pyyaml
+          pip install -q --require-hashes -r requirements/execution.txt
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
           ls -la /dev/kvm || echo "pas de KVM : émulation (plus lent)"
       - name: L'appliance démarre, écoute sans émettre, alimente le central et se met à jour

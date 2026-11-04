@@ -55,5 +55,10 @@ def test_gallery_images_exist():
 
 def test_pages_workflow_pinned():
     wf = (ROOT / ".github/workflows/site.yml").read_text(encoding="utf-8")
-    assert '"mkdocs>=1.6,<2"' in wf and '"mkdocs-material>=9.5,<10"' in wf
+    assert "--require-hashes -r requirements/site.txt" in wf
+    # Bornes (MkDocs 1.x, Material 9.x) dans le fichier source, versions exactes figées dans site.txt
+    src = (ROOT / "requirements/site.in").read_text(encoding="utf-8")
+    assert "mkdocs>=1.6,<2" in src and "mkdocs-material>=9.5,<10" in src
+    lock = (ROOT / "requirements/site.txt").read_text(encoding="utf-8")
+    assert re.search(r"^mkdocs==1\.\d+", lock, re.M) and re.search(r"^mkdocs-material==9\.\d+", lock, re.M)
     assert "tools/site.py --build" in wf and "deploy-pages" in wf
