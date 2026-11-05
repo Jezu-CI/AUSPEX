@@ -73,7 +73,7 @@ jobs:
           echo "Version $tag, commit ${GITHUB_SHA::12}, brouillon : $publier"
       - name: Tests
         run: |
-          pip install -q --require-hashes -r requirements/dev.txt && pip install -q --no-deps -e .
+          pip install -q --require-hashes -r requirements/dev.txt -r requirements/construction.txt && pip install -q --no-deps --no-build-isolation -e .
           pytest -q
       - name: Image du capteur, ISO et image de mise à jour
         run: |

@@ -40,7 +40,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install -q --require-hashes -r requirements/execution.txt && pip install -q --no-deps -e .
+      - run: pip install -q --require-hashes -r requirements/execution.txt -r requirements/construction.txt && pip install -q --no-deps --no-build-isolation -e .
       - name: Image du capteur
         run: |
           docker build -q -t auspex-sensor:ci sensor >/dev/null

@@ -12,11 +12,16 @@ WORKDIR /opt/auspex
 COPY pyproject.toml README.md LICENSE ./
 # Dépendances figées : version exacte et empreinte de chaque paquet vérifiées
 # (requirements/execution.txt, régénéré par tools/figer-dependances.sh).
-COPY requirements/execution.txt ./requirements/execution.txt
-RUN pip install --no-cache-dir --require-hashes -r requirements/execution.txt
+# setuptools (construction.txt) sert seulement à construire le paquet auspex,
+# sans rien télécharger, puis il est retiré de l'image.
+COPY requirements/execution.txt requirements/construction.txt ./requirements/
+RUN pip install --no-cache-dir --require-hashes -r requirements/execution.txt -r requirements/construction.txt
 COPY src ./src
 COPY rules ./rules
-RUN pip install --no-cache-dir --no-deps . && rm -rf /root/.cache
+RUN pip wheel --no-cache-dir --no-deps --no-build-isolation -w /tmp/paquet . \
+ && pip install --no-cache-dir --no-deps /tmp/paquet/auspex-*.whl \
+ && pip uninstall -y -q setuptools \
+ && rm -rf /tmp/paquet /root/.cache build src/*.egg-info
 
 COPY deploy/central/entrypoint.sh /usr/local/bin/auspex-entrypoint
 RUN chmod 0755 /usr/local/bin/auspex-entrypoint

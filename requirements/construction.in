@@ -1,0 +1,3 @@
+# Construction du paquet auspex (pip install --no-build-isolation) : outil de
+# construction figé lui aussi, au lieu d'un setuptools téléchargé sans empreinte.
+setuptools>=70.1

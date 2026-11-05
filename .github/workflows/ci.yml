@@ -87,7 +87,7 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       - name: Installation
-        run: pip install --require-hashes -r requirements/dev.txt && pip install --no-deps -e .
+        run: pip install --require-hashes -r requirements/dev.txt -r requirements/construction.txt && pip install --no-deps --no-build-isolation -e .
       - name: Tests unitaires et de bout en bout
         shell: bash
         run: |
@@ -107,7 +107,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install --require-hashes -r requirements/execution.txt && pip install --no-deps -e .
+      - run: pip install --require-hashes -r requirements/execution.txt -r requirements/construction.txt && pip install --no-deps --no-build-isolation -e .
       - name: Rejouer le scénario IT/OT
         working-directory: examples/demo
         run: |
@@ -136,7 +136,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install --require-hashes -r requirements/sbom.txt && pip install --no-deps -e .
+      - run: pip install --require-hashes -r requirements/sbom.txt -r requirements/construction.txt && pip install --no-deps --no-build-isolation -e .
       - run: cyclonedx-py environment --of JSON -o sbom.cdx.json
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
@@ -153,7 +153,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install --require-hashes -r requirements/dev.txt && pip install --no-deps -e .
+      - run: pip install --require-hashes -r requirements/dev.txt -r requirements/construction.txt && pip install --no-deps --no-build-isolation -e .
       - name: Construire l'image capteur
         run: docker build -t auspex-sensor:ci sensor
       - name: Versions embarquées
@@ -203,7 +203,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: pip install --require-hashes -r requirements/dev.txt && pip install --no-deps -e .
+      - run: pip install --require-hashes -r requirements/dev.txt -r requirements/construction.txt && pip install --no-deps --no-build-isolation -e .
       - name: Démarrer NetBox
         run: |
           docker run -d --name netbox --network ${{ job.services.postgres.network }} -p 8080:8080 \

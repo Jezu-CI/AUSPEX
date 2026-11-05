@@ -1,0 +1,4 @@
+# Outil de régénération des dépendances figées (tools/figer-dependances.sh).
+pip-tools==7.4.1
+# pip-tools 7.4 ne fonctionne pas avec pip 25.1 et plus récent.
+pip<25

@@ -133,14 +133,16 @@ def _pip_installs():
 
 
 def test_every_pip_install_is_pinned():
-    """Pinned-Dependencies : chaque « pip install » vient d'un fichier figé vérifié par
+    """Pinned-Dependencies : chaque « pip install » vient de fichiers figés vérifiés par
     empreinte (--require-hashes -r requirements/…), ou installe le projet lui-même
-    sans aller chercher de dépendance (--no-deps)."""
+    sans rien télécharger : --no-deps, et --no-build-isolation (setuptools vient de
+    requirements/construction.txt, au lieu d'être téléchargé sans empreinte)."""
     seen = 0
     for f, n, cmd in _pip_installs():
         seen += 1
-        ok = re.search(r"--require-hashes -r (\.\./)*requirements/[a-z]+\.txt\s*$", cmd.strip()) or \
-            re.search(r"--no-deps( -e)? \.\s*$", cmd.strip())
+        ok = re.search(r"--require-hashes( -r (\.\./)*requirements/[a-z]+\.txt)+\s*$", cmd.strip()) or \
+            re.search(r"--no-deps --no-build-isolation -e \.\s*$", cmd.strip()) or \
+            re.search(r"--no-deps /tmp/paquet/auspex-\*\.whl\s*\\?$", cmd.strip())
         assert ok, f"{_ids(f)}:{n} : {cmd}"
     assert seen >= 10
 
@@ -162,7 +164,8 @@ def test_lock_files_resolve_from_step_directory():
     de l'étape (working-directory), pas seulement depuis la racine du dépôt."""
     seen = 0
     for f, name, wdir, run in _run_steps_with_dir():
-        for path in re.findall(r"pip install[^&;|\n]*?-r (\S+)", run):
+        for cmd in re.findall(r"pip install[^&;|\n]*", run):
+          for path in re.findall(r"-r (\S+)", cmd):
             seen += 1
             assert (ROOT / wdir / path).resolve().is_file(), f"{_ids(f)} « {name} » ({wdir}) : {path}"
     assert seen >= 10
@@ -185,8 +188,11 @@ def test_lock_files_fully_hashed(lock):
 
 def test_central_image_uses_locked_dependencies():
     df = (ROOT / "deploy" / "central" / "Dockerfile").read_text(encoding="utf-8")
-    assert "--require-hashes -r requirements/execution.txt" in df
-    assert "pip install --no-cache-dir --no-deps ." in df
+    assert "--require-hashes -r requirements/execution.txt -r requirements/construction.txt" in df
+    # Paquet construit sans rien télécharger, setuptools retiré ensuite de l'image
+    assert "pip wheel --no-cache-dir --no-deps --no-build-isolation -w /tmp/paquet ." in df
+    assert "pip install --no-cache-dir --no-deps /tmp/paquet/auspex-*.whl" in df
+    assert "pip uninstall -y -q setuptools" in df
     lock = (REQ / "execution.txt").read_text(encoding="utf-8")
     try:
         import tomllib
@@ -202,3 +208,30 @@ def test_dependabot_watches_lock_files():
     cfg = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))
     pip = next(u for u in cfg["updates"] if u["package-ecosystem"] == "pip")
     assert "/requirements" in pip["directories"]
+
+
+def test_project_installs_never_download_build_tools():
+    """Toute installation du projet (-e .) se fait sans isolation de construction,
+    après avoir installé requirements/construction.txt dans la même commande."""
+    seen = 0
+    for f, name, wdir, run in _run_steps_with_dir():
+        for line in run.splitlines():
+            if re.search(r"pip install( -q)? --no-deps", line):
+                seen += 1
+                assert "--no-build-isolation" in line, f"{_ids(f)} « {name} »"
+                assert "-r requirements/construction.txt &&" in line, f"{_ids(f)} « {name} »"
+    assert seen >= 7
+
+
+def test_regeneration_tool_is_locked_and_fails_loudly():
+    """tools/figer-dependances.sh installe pip-tools depuis requirements/figer.txt
+    (empreintes), régénère aussi construction.txt et figer.txt, et une erreur
+    arrête le script au lieu d'être masquée par le filtrage de l'affichage."""
+    sh = (ROOT / "tools" / "figer-dependances.sh").read_text(encoding="utf-8")
+    assert "pip install -q --disable-pip-version-check --require-hashes -r requirements/figer.txt" in sh
+    for lock in ("construction", "figer"):
+        assert f"-o requirements/{lock}.txt requirements/{lock}.in" in sh
+    assert "|| rc=$?" in sh and '[ "$rc" -eq 0 ] ||' in sh
+    assert "| grep" not in sh          # plus de tube qui masquerait le code de retour
+    figer = (REQ / "figer.txt").read_text(encoding="utf-8")
+    assert re.search(r"^pip-tools==7\.4\.", figer, re.M) and re.search(r"^pip==24\.", figer, re.M)

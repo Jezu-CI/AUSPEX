@@ -7,6 +7,9 @@
 #   sbom.txt        produit + outil SBOM seulement (inventaire du produit)
 #   site.txt        construction du site
 #   captures.txt    captures d'écran (Playwright)
+#   construction.txt  setuptools, pour construire le paquet auspex
+#                     (pip install --no-build-isolation)
+#   figer.txt       pip-tools lui-même, installé par ce script avec empreintes
 #
 #   tools/figer-dependances.sh            (depuis la racine du dépôt)
 #
@@ -18,18 +21,25 @@
 set -euo pipefail
 
 IMAGE="python:3.10-slim@sha256:6ff506466f8b1e981719b468cc0023b8ef000b983cdec0eafe119d01f379e31d"
-PIP_TOOLS="pip-tools==7.4.1"
 
 cd "$(dirname "$0")/.."
+# Sortie gardée à part : messages de dépréciation de setuptools filtrés à
+# l'affichage, mais une erreur arrête bien le script.
+out=$(mktemp); trap 'rm -f "$out"' EXIT
+rc=0
 docker run --rm --memory 1g -v "$PWD:/src" -w /src -u "$(id -u):$(id -g)" -e HOME=/tmp \
-  -e CUSTOM_COMPILE_COMMAND="tools/figer-dependances.sh" -e PIP_TOOLS="$PIP_TOOLS" "$IMAGE" sh -euc '
+  -e CUSTOM_COMPILE_COMMAND="tools/figer-dependances.sh" "$IMAGE" sh -euc '
 python -m venv /tmp/v && . /tmp/v/bin/activate
-pip install -q --disable-pip-version-check "$PIP_TOOLS"
+pip install -q --disable-pip-version-check --require-hashes -r requirements/figer.txt
 c() { pip-compile -q --generate-hashes --allow-unsafe --strip-extras --no-emit-index-url "$@"; }
 c -o requirements/execution.txt pyproject.toml
 c --extra dev -o requirements/dev.txt pyproject.toml requirements/outils.in
 c -o requirements/sbom.txt pyproject.toml requirements/outils.in
 c -o requirements/site.txt requirements/site.in
 c -o requirements/captures.txt requirements/captures.in
-' 2>&1 | grep -v -i -E "setuptools|license|\*{10}|!!|corresp\(|^\s*$|See https|By 20|Please" || true
+c -o requirements/construction.txt requirements/construction.in
+c -o requirements/figer.txt requirements/figer.in
+' >"$out" 2>&1 || rc=$?
+grep -v -i -E "setuptools|license|\*{10}|!!|corresp\(|^\s*$|See https|By 20|Please|builds will no longer" "$out" || true
+[ "$rc" -eq 0 ] || { echo "ÉCHEC de la régénération (code $rc) : voir git diff requirements/" >&2; exit "$rc"; }
 echo "Dépendances figées régénérées : requirements/*.txt"
