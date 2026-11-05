@@ -348,7 +348,7 @@ jobs:
       - name: Trusted hosts — user1 refusé hors de ses deux adresses
         working-directory: deploy
         run: |
-          pip install -q --require-hashes -r requirements/execution.txt
+          pip install -q --require-hashes -r ../requirements/execution.txt
           python ../tools/ci_trusted_hosts.py
           $A health
       - name: Double authentification (application et e-mail) des comptes locaux
@@ -426,7 +426,7 @@ jobs:
         working-directory: deploy
         shell: bash
         run: |
-          pip install -q --require-hashes -r requirements/captures.txt
+          pip install -q --require-hashes -r ../requirements/captures.txt
           python -m playwright install --with-deps chromium >/dev/null
           set +e
           python ../tools/ci_webauthn.py > webauthn.log 2>&1

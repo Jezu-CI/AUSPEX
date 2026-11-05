@@ -139,11 +139,32 @@ def test_every_pip_install_is_pinned():
     seen = 0
     for f, n, cmd in _pip_installs():
         seen += 1
-        ok = re.search(r"--require-hashes -r requirements/[a-z]+\.txt\s*$", cmd.strip()) or \
+        ok = re.search(r"--require-hashes -r (\.\./)*requirements/[a-z]+\.txt\s*$", cmd.strip()) or \
             re.search(r"--no-deps( -e)? \.\s*$", cmd.strip())
         assert ok, f"{_ids(f)}:{n} : {cmd}"
-        if "-r requirements/" in cmd:
-            assert (ROOT / re.search(r"requirements/[a-z]+\.txt", cmd).group(0)).exists(), cmd
+    assert seen >= 10
+
+
+def _run_steps_with_dir():
+    """(workflow, nom de l'étape, dossier de travail, commandes) de chaque étape run."""
+    for f in WORKFLOWS:
+        wf = yaml.safe_load(f.read_text(encoding="utf-8"))
+        wf_dir = ((wf.get("defaults") or {}).get("run") or {}).get("working-directory", ".")
+        for job in (wf.get("jobs") or {}).values():
+            job_dir = ((job.get("defaults") or {}).get("run") or {}).get("working-directory", wf_dir)
+            for step in job.get("steps") or []:
+                if "run" in step:
+                    yield f, step.get("name", step["run"][:40]), step.get("working-directory", job_dir), step["run"]
+
+
+def test_lock_files_resolve_from_step_directory():
+    """Le fichier figé passé à « pip install -r » existe vu du dossier de travail
+    de l'étape (working-directory), pas seulement depuis la racine du dépôt."""
+    seen = 0
+    for f, name, wdir, run in _run_steps_with_dir():
+        for path in re.findall(r"pip install[^&;|\n]*?-r (\S+)", run):
+            seen += 1
+            assert (ROOT / wdir / path).resolve().is_file(), f"{_ids(f)} « {name} » ({wdir}) : {path}"
     assert seen >= 10
 
 
