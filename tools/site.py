@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import posixpath
 import re
 import shutil
@@ -252,6 +253,11 @@ def assemble() -> None:
     (OUT / "captures.md").write_text(gallery(), encoding="utf-8")
     (OUT / "faq.md").write_text(faq(), encoding="utf-8")
     (OUT / "faq.yaml").unlink()
+    # Feuille de style renommée avec l'empreinte de son contenu (anti-cache navigateur)
+    css = OUT / "assets" / "auspex.css"
+    hashed = f"assets/auspex.{hashlib.sha256(css.read_bytes()).hexdigest()[:10]}.css"
+    shutil.copyfile(css, OUT / hashed)
+    os.environ["AUSPEX_CSS"] = hashed
 
 
 def main(argv: list[str]) -> int:

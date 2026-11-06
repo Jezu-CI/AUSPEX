@@ -175,3 +175,19 @@ def test_audience_chooser_on_home():
     for page in ("guide.md", "documentation/index.md"):
         text = (site.OUT / page).read_text(encoding="utf-8")
         assert "Vous voulez utiliser Auspex" in text and "utilisateur/index.md" in text
+
+
+def test_stylesheet_name_changes_with_content():
+    """Anti-cache : la feuille de style publiée porte l'empreinte de son contenu, et le gabarit
+    la charge par ce nom ; les icônes de l'accueil ont une taille même sans feuille de style."""
+    import hashlib
+    import os
+    site = _site()
+    site.assemble()
+    digest = hashlib.sha256((ROOT / "site/assets/auspex.css").read_bytes()).hexdigest()[:10]
+    assert os.environ["AUSPEX_CSS"] == f"assets/auspex.{digest}.css"
+    assert (site.OUT / os.environ["AUSPEX_CSS"]).is_file()
+    assert "{{ config.extra.css | url }}" in (ROOT / "overrides/main.html").read_text(encoding="utf-8")
+    assert "extra_css" not in (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+    home = (ROOT / "site/index.md").read_text(encoding="utf-8")
+    assert home.count('viewBox="0 0 24 24" width="28" height="28"') == 2
