@@ -18,7 +18,8 @@ environnements IT et industriels (OT). Sans agent, sans
 compte de service, sans émettre un seul paquet sur les réseaux surveillés.
 
 [Télécharger](telecharger.md){ .md-button .md-button--primary }
-[Documentation](guide.md){ .md-button }
+[Guide utilisateur](utilisateur/index.md){ .md-button }
+[Documentation technique](guide.md){ .md-button }
 [Code source](https://github.com/Jezu-CI/AUSPEX){ .md-button }
 
 <small>Open source, licence AGPL v3 · conçu par Yann Mathon · [English summary](en/index.md){ hreflang=en lang=en }</small>

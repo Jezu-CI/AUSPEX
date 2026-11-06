@@ -76,9 +76,23 @@ markdown_extensions:
 nav:
   - Accueil: index.md
   - Télécharger: telecharger.md
+  - Guide utilisateur:
+      - utilisateur/index.md
+      - Les notions à connaître: utilisateur/notions.md
+      - Mettre Auspex en route: utilisateur/mise-en-route.md
+      - Se connecter: utilisateur/connexion.md
+      - Le tableau de bord: utilisateur/tableau-de-bord.md
+      - Comprendre les écarts: utilisateur/ecarts.md
+      - La carte des actifs: utilisateur/carte.md
+      - L'inventaire dans NetBox: utilisateur/inventaire.md
+      - Déclarer les flux autorisés: utilisateur/regles-de-flux.md
+      - Installer un capteur: utilisateur/capteurs.md
+      - Recevoir les alertes: utilisateur/alertes.md
+      - Les rapports d'audit: utilisateur/audits.md
+      - Au quotidien: utilisateur/quotidien.md
   - Captures d'écran: captures.md
   - Questions fréquentes: faq.md
-  - Guide: guide.md
+  - Guide technique: guide.md
   - Documentation:
       - documentation/index.md
       - Authentification et accès: documentation/01-authentification.md
