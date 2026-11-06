@@ -1,6 +1,6 @@
 # Site web du projet : python tools/site.py --build (sources assemblées dans build/site-src)
 site_name: Auspex
-site_description: "Auspex, CMDB passive open source pour l'IT et l'OT : inventaire des actifs et contrôle de la segmentation réseau par écoute passive, sans agent, avec NetBox et Zeek. Preuves NIS2, DORA, IEC 62443."
+site_description: "Auspex, CMDB open source et passive pour l'IT et l'OT : inventaire des actifs et contrôle de la segmentation réseau par écoute passive, sans agent, avec NetBox et Zeek. Preuves NIS2, DORA, IEC 62443."
 site_url: https://jezu-ci.github.io/AUSPEX/
 repo_url: https://github.com/Jezu-CI/AUSPEX
 repo_name: Jezu-CI/AUSPEX

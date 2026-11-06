@@ -6,6 +6,20 @@
     Il dresse l'inventaire des actifs et contrôle la segmentation du réseau **en écoutant le
     trafic** (port miroir ou TAP), sans agent, sans compte de service et sans émettre un seul
     paquet sur les réseaux surveillés. Il s'appuie sur NetBox et sur Zeek.
+- q: Auspex est-il une CMDB open source ?
+  a: >-
+    Oui. Auspex est une **CMDB (base de données de gestion des configurations) open source**,
+    sous licence AGPL v3, spécialisée dans ce qui est réellement présent sur le réseau : les
+    actifs et leurs flux sont découverts par écoute passive, puis rangés dans NetBox à côté de
+    l'inventaire déclaré, avec les écarts entre les deux. Il couvre l'IT comme l'OT
+    (automates, IHM, passerelles industrielles).
+- q: Quelle différence avec une CMDB comme GLPI ou iTop ?
+  a: >-
+    GLPI et iTop sont des CMDB généralistes, alimentées par des agents installés sur les postes,
+    par des imports ou à la main, et souvent couplées à la gestion des tickets. Auspex ne gère
+    pas de tickets : il découvre les actifs **sans rien installer**, en observant le trafic, ce
+    qui convient aussi aux équipements industriels sur lesquels aucun agent ne peut tourner. Les
+    deux approches se complètent : Auspex révèle ce que l'inventaire déclaré ignore.
 - q: Auspex envoie-t-il du trafic sur le réseau surveillé ?
   a: >-
     Non. Le capteur ne fait qu'écouter une copie du trafic : l'interface d'écoute de

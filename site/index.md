@@ -1,6 +1,6 @@
 ---
-title: Auspex — CMDB passive IT/OT open source (NetBox, Zeek)
-description: "Auspex, CMDB passive open source pour l'IT et l'OT : inventaire des actifs et contrôle de la segmentation réseau par écoute passive, sans agent, avec NetBox et Zeek. Preuves NIS2, DORA, IEC 62443."
+title: Auspex — CMDB open source passive pour l'IT et l'OT (NetBox, Zeek)
+description: "Auspex, CMDB open source et passive pour l'IT et l'OT : inventaire des actifs et contrôle de la segmentation réseau par écoute passive, sans agent, avec NetBox et Zeek. Preuves NIS2, DORA, IEC 62443."
 hide:
   - navigation
   - toc
@@ -12,8 +12,9 @@ hide:
 
 # Auspex
 
-**Inventaire des actifs et contrôle de la segmentation réseau par écoute
-passive**, pour les environnements IT et industriels (OT). Sans agent, sans
+**La CMDB open source qui se remplit en écoutant le réseau** : inventaire
+des actifs et contrôle de la segmentation par écoute passive, pour les
+environnements IT et industriels (OT). Sans agent, sans
 compte de service, sans émettre un seul paquet sur les réseaux surveillés.
 
 [Télécharger](telecharger.md){ .md-button .md-button--primary }
