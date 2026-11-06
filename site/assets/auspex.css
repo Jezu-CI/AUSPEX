@@ -41,3 +41,15 @@
 
 .md-typeset p:has(> img.ax-schema) { text-align: center; }
 .md-typeset img.ax-schema { max-width: 100%; height: auto; }
+
+/* Choix du public sur l'accueil : utilisateur ou technique */
+.ax-choix-titre { margin: 1.2rem 0 0.6rem; font-weight: 600; color: var(--md-default-fg-color--light); }
+.ax-choix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; max-width: 46rem; margin: 0 auto 1.4rem; text-align: left; }
+@media (max-width: 44em) { .ax-choix { grid-template-columns: 1fr; } }
+.md-typeset a.ax-choix-carte { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 1.1rem; border: 2px solid var(--md-default-fg-color--lightest); border-radius: 10px; color: var(--md-default-fg-color); background: var(--md-default-bg-color); transition: border-color .15s, box-shadow .15s, transform .15s; }
+.md-typeset a.ax-choix-carte:hover, .md-typeset a.ax-choix-carte:focus-visible { border-color: var(--md-accent-fg-color); box-shadow: 0 4px 16px rgba(0,0,0,.12); transform: translateY(-2px); color: var(--md-default-fg-color); }
+.ax-choix-carte strong { font-size: 1.05rem; }
+.ax-choix-carte span { font-size: 0.8rem; line-height: 1.5; color: var(--md-default-fg-color--light); }
+.md-typeset .ax-choix-carte .ax-choix-icone { color: var(--md-accent-fg-color); line-height: 0; }
+.ax-choix-icone svg { width: 1.8rem; height: 1.8rem; fill: currentColor; }
+.md-typeset .ax-choix-carte .ax-choix-suite { margin-top: auto; font-weight: 600; color: var(--md-accent-fg-color); }

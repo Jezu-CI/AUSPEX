@@ -9,7 +9,8 @@ Documentation en français ; résumé en anglais disponible.
 
 - [Accueil](https://jezu-ci.github.io/AUSPEX/): présentation, fonctionnalités, fonctionnement
 - [Questions fréquentes](https://jezu-ci.github.io/AUSPEX/faq/): écoute passive, protocoles industriels, segmentation, conformité, licence, prérequis
-- [Guide](https://jezu-ci.github.io/AUSPEX/guide/): installation du central, capteurs, règles de flux, identification, commandes
+- [Guide utilisateur](https://jezu-ci.github.io/AUSPEX/utilisateur/): Auspex en langage simple : notions, mise en route, tableau de bord, écarts, carte, inventaire, règles de flux, capteurs, alertes, rapports d'audit
+- [Guide technique](https://jezu-ci.github.io/AUSPEX/guide/): installation du central, capteurs, règles de flux, identification, commandes
 - [Télécharger](https://jezu-ci.github.io/AUSPEX/telecharger/): fichiers de version, vérification Sigstore et SLSA, prérequis
 - [English summary](https://jezu-ci.github.io/AUSPEX/en/): the project in English
 
