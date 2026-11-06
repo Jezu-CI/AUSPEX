@@ -7,15 +7,16 @@
 [![Licence AGPL v3](https://img.shields.io/badge/licence-AGPL%20v3-blue)](LICENSE)
 [![Site](https://img.shields.io/badge/site-jezu--ci.github.io%2FAUSPEX-12805a)](https://jezu-ci.github.io/AUSPEX/)
 
-*CMDB passive IT/OT — v0.1 « Silence Before Dawn »*
+*CMDB open source passive IT/OT — v0.1 « Silence Before Dawn »*
 
 **Site du projet : [jezu-ci.github.io/AUSPEX](https://jezu-ci.github.io/AUSPEX/)** — documentation, captures d'écran, téléchargement.
 
 À Rome, l'auspex lisait les présages en observant le vol des oiseaux, sans
 jamais intervenir. C'est le principe de l'outil : tout voir, ne rien émettre.
 
-Inventaire des actifs et contrôle de la segmentation réseau **par écoute
-passive** : sans agent, sans compte de service, sans émettre un seul paquet
+Auspex est une **CMDB open source** qui se remplit en écoutant le réseau :
+inventaire des actifs et contrôle de la segmentation réseau **par écoute
+passive**, sans agent, sans compte de service, sans émettre un seul paquet
 sur les réseaux surveillés. Conçu pour les environnements IT et industriels
 (OT), et pour produire les preuves attendues par NIS2, DORA et l'IEC 62443.
 

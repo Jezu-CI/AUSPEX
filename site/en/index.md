@@ -8,8 +8,9 @@ lang: en
 
 # Auspex — passive IT/OT CMDB
 
-**Auspex inventories assets and checks network segmentation by passive
-listening**, for IT and industrial (OT/ICS) environments. No agent, no service
+**Auspex is an open-source CMDB that fills itself by listening to the
+network**: it inventories assets and checks network segmentation by passive
+listening, for IT and industrial (OT/ICS) environments. No agent, no service
 account, and not a single packet sent on the monitored networks.
 
 [Download](../telecharger.md){ .md-button .md-button--primary }
