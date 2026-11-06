@@ -122,7 +122,7 @@ def read_manifest(root: Path) -> Manifest:
     try:
         d = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
-        raise ModuleError(f"module.yaml illisible : {exc}")
+        raise ModuleError(f"module.yaml illisible : {exc}") from exc
     missing = [k for k in ("name", "version", "type", "auspex", "license") if not d.get(k)]
     if missing:
         raise ModuleError(f"module.yaml : champ(s) manquant(s) {', '.join(missing)}")
@@ -179,7 +179,7 @@ def validate_content(root: Path, manifest: Manifest) -> None:
             if (rules_dir / "aliases.yaml").exists():
                 load_normalizer(rules_dir / "aliases.yaml")
         except (RuleError, yaml.YAMLError, KeyError, TypeError, ValueError) as exc:
-            raise ModuleError(f"règles invalides : {exc}")
+            raise ModuleError(f"règles invalides : {exc}") from exc
     elif manifest.type == "references":
         load_references(root)
 

@@ -244,7 +244,7 @@ def assemble() -> None:
         if page == "guide.md":
             text = BADGES.sub("", text)  # badges du README : images hébergées ailleurs
         if page in AIGUILLAGE:
-            text = re.sub(r"^(# .*\n)", lambda m: m.group(1) + "\n" + AIGUILLAGE[page] + "\n", text, count=1, flags=re.M)
+            text = re.sub(r"^(# .*\n)", lambda m, page=page: m.group(1) + "\n" + AIGUILLAGE[page] + "\n", text, count=1, flags=re.M)
         dest.write_text(with_description(diagrams(text, page), page), encoding="utf-8")
     for page in OUT.rglob("*.md"):
         text = page.read_text(encoding="utf-8")

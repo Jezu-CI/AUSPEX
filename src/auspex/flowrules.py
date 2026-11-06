@@ -260,7 +260,7 @@ def import_rules(path: str | Path, zone_names: Iterable[str]) -> ImportResult:
                 return ImportResult([], problems)
             header_checked = True
 
-        def cell(name: str) -> str:
+        def cell(name: str, row=row) -> str:
             v = row.get(name)
             if v is None:
                 return ""

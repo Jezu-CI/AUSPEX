@@ -164,7 +164,7 @@ def updates(pcap: Path) -> None:
     check(f"auspex capteur publier {good}", r.returncode == 0)
     check(f"mise à jour {good} téléchargée et installée",
           wait_serial(rf"mise à jour {re.escape(good)} installée \(emplacement a\)", 900))
-    check(f"analyse redémarrée sur la mise à jour (emplacement a)",
+    check("analyse redémarrée sur la mise à jour (emplacement a)",
           wait_serial(rf"analyse : version {re.escape(good)} \(emplacement a\)", 120))
     check(f"mise à jour {good} validée après l'essai", wait_serial(rf"mise à jour {re.escape(good)} validée", 180))
 
@@ -178,7 +178,7 @@ def updates(pcap: Path) -> None:
     check(f"analyse revenue sur {good} (emplacement a)",
           wait_serial(rf"(?s)en échec.*analyse : version {re.escape(good)} \(emplacement a\)", 120))
     time.sleep(90)
-    check(f"version abandonnée jamais retentée", serial().count(f"mise à jour {bad} installée") == 1)
+    check("version abandonnée jamais retentée", serial().count(f"mise à jour {bad} installée") == 1)
 
     # 4. Le central voit la version de chaque capteur, et l'analyse continue.
     since = time.time()
@@ -278,7 +278,7 @@ def main() -> int:
             if any(f.stat().st_size > 0 for f in files):
                 shipped = True
                 break
-        check(f"logs de l'appliance reçus par le central (logs/capteur-vm/)", shipped)
+        check("logs de l'appliance reçus par le central (logs/capteur-vm/)", shipped)
         ingested = False
         for _ in range(30):
             try:

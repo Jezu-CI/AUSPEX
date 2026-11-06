@@ -6,6 +6,11 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 ## [0.2.0] — en préparation
 
+### Sécurité
+
+- **Codes de secours de la double authentification** : empreintes **scrypt** avec un sel propre à chaque code, au lieu de SHA-256 sans sel. Un vol de la base de données ne permet plus de retrouver les codes par recherche exhaustive. Les codes distribués avant la 0.2.0 restent valables jusqu'à leur utilisation.
+- **Analyse de code (linter)** : ruff vérifie à chaque modification les erreurs probables et pièges courants (règles dans `pyproject.toml`) ; corrections des points relevés (exceptions qui masquaient leur cause, fermetures sur une variable de boucle, imports inutiles).
+
 ### Changé
 
 - **Licence : GNU AGPL v3**, avec un terme additionnel d'attribution

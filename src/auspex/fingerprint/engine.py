@@ -149,7 +149,7 @@ def _parse_rule(d: dict, where: str) -> FingerprintRule:
                 try:
                     rx = re.compile(spec["regex"], re.IGNORECASE)
                 except re.error as exc:
-                    raise RuleError(f"{where} ({d['id']}) : regex invalide sur {fname} ({exc})")
+                    raise RuleError(f"{where} ({d['id']}) : regex invalide sur {fname} ({exc})") from exc
                 conditions.append(Condition(fname, regex=rx))
             elif "one_of" in spec:
                 conditions.append(Condition(fname, one_of=tuple(str(v).lower() for v in spec["one_of"])))
@@ -159,7 +159,7 @@ def _parse_rule(d: dict, where: str) -> FingerprintRule:
                 try:
                     conditions.append(Condition(fname, minimum=float(spec["min"])))
                 except (TypeError, ValueError):
-                    raise RuleError(f"{where} ({d['id']}) : min doit être un nombre sur {fname}")
+                    raise RuleError(f"{where} ({d['id']}) : min doit être un nombre sur {fname}") from None
             else:
                 raise RuleError(f"{where} ({d['id']}) : condition inconnue sur {fname}")
         else:

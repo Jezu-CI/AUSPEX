@@ -1,6 +1,7 @@
-import pytest
-import json
 """Fichiers de déploiement du central : cohérence avec le code."""
+import json
+
+import pytest
 
 from pathlib import Path
 
@@ -136,6 +137,7 @@ def test_install_generates_private_env_and_valid_token(tmp_path):
     assert env["AUSPEX_UID"] != "0"           # les services ne tournent jamais en root
     # Deux installations ne partagent jamais les mêmes secrets
     r2 = subprocess.run(["bash", "-c", script], cwd=tmp_path / "..", capture_output=True, text=True)
+    assert r2.returncode == 0, r2.stderr
     other = dict(l.split("=", 1) for l in (tmp_path / ".." / ".env").read_text().splitlines()
                  if l and not l.startswith("#"))
     assert other["NETBOX_ADMIN_TOKEN"] != env["NETBOX_ADMIN_TOKEN"]
