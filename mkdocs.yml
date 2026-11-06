@@ -5,13 +5,15 @@ site_url: https://jezu-ci.github.io/AUSPEX/
 repo_url: https://github.com/Jezu-CI/AUSPEX
 repo_name: Jezu-CI/AUSPEX
 edit_uri: ""
-copyright: Auspex — concept de Yann Mathon · licence AGPL v3 · basé sur NetBox Community (Apache 2.0)
+copyright: 'Auspex — concept de Yann Mathon · licence AGPL v3 · basé sur NetBox Community (Apache 2.0) · <a href="/AUSPEX/mentions-legales/">Mentions légales</a> · <a href="/AUSPEX/confidentialite/">Confidentialité (aucun cookie)</a>'
 docs_dir: build/site-src
 site_dir: build/site
 
 theme:
   name: material
   custom_dir: overrides
+  # Polices du système : aucune requête vers Google Fonts (confidentialité des visiteurs)
+  font: false
   language: fr
   logo: assets/auspex-icon.svg
   favicon: assets/auspex-icon.svg
@@ -90,4 +92,6 @@ nav:
       - Sécurité: securite.md
       - Composants tiers: composants-tiers.md
       - À propos: a-propos.md
+      - Mentions légales: mentions-legales.md
+      - Confidentialité: confidentialite.md
       - In English: en/index.md

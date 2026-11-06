@@ -46,3 +46,12 @@ identifiants sur les actifs ou stockerait un secret dans `auspex.yaml` sera
 refusée, même optionnelle. Voir [SECURITY.md](SECURITY.md).
 
 Les échanges sur le projet suivent le [code de conduite](CODE_OF_CONDUCT.md).
+
+## Site web
+
+Aperçu : `python tools/site.py --build` (résultat dans `build/site`). Les schémas
+Mermaid sont pré-rendus en images : après avoir modifié ou ajouté un schéma
+(README, `docs/`, `site/`), lancer `python tools/site.py --diagrammes`
+(nécessite [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli), `mmdc`) et
+versionner les fichiers de `site/assets/diagrammes/`. Le site ne doit charger
+aucune ressource depuis un autre domaine : la construction échoue sinon.

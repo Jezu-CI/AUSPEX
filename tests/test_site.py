@@ -111,3 +111,53 @@ def test_seo_template_and_social_image():
         assert needle in tpl
     assert (ROOT / "site/assets/auspex-apercu-social.png").is_file()
     assert "overrides/**" in (ROOT / ".github/workflows/site.yml").read_text(encoding="utf-8")
+
+
+def test_diagrams_prerendered():
+    """Chaque schéma Mermaid des pages du site a ses rendus clair et sombre, sans rendu orphelin
+    (après modification d'un schéma : python tools/site.py --diagrammes)."""
+    site = _site()
+    wanted = site.all_diagrams()
+    assert len(wanted) >= 5
+    for ident in wanted:
+        for variante in ("clair", "sombre"):
+            svg = site.DIAGRAMMES / f"{ident}-{variante}.svg"
+            assert svg.is_file(), f"schéma non pré-rendu : {svg.name}"
+            head = svg.read_text(encoding="utf-8")[:300]
+            assert 'width="100%"' not in head  # taille propre (intrinsic_size)
+    orphans = {f.name.split("-")[0] for f in site.DIAGRAMMES.glob("*.svg")} - set(wanted)
+    assert not orphans, orphans
+    site.assemble()
+    for page in site.OUT.rglob("*.md"):
+        assert "```mermaid" not in page.read_text(encoding="utf-8"), page
+
+
+def test_no_third_party_resources(tmp_path):
+    """Confidentialité : le contrôle de publication repère toute ressource chargée depuis un autre site."""
+    site = _site()
+    bad = {
+        "polices.html": '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">',
+        "script.html": '<script src="https://unpkg.com/mermaid@11/dist/mermaid.min.js"></script>',
+        "image.html": '<img src="https://img.shields.io/badge/x-y-blue" alt="">',
+        "mermaid.html": '<pre class="mermaid"><code>flowchart LR</code></pre>',
+        "preconnect.html": '<link rel="preconnect" href="https://fonts.gstatic.com">',
+    }
+    for name, html in bad.items():
+        (tmp_path / name).write_text(html, encoding="utf-8")
+    (tmp_path / "ok.html").write_text('<a href="https://github.com/Jezu-CI/AUSPEX">dépôt</a>'
+                                      '<link rel="canonical" href="https://jezu-ci.github.io/AUSPEX/">'
+                                      '<img src="assets/x.svg">', encoding="utf-8")
+    found = {line.split(" : ")[0] for line in site.external_resources(tmp_path)}
+    assert found == set(bad)
+
+
+def test_privacy_settings():
+    conf = (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+    assert "\n  font: false\n" in conf  # pas de Google Fonts
+    source = (ROOT / "overrides/partials/source.html").read_text(encoding="utf-8")
+    assert "data-md-component" not in source.split("-#}", 1)[1]  # pas d'appel à l'API GitHub
+    site = _site()
+    site.assemble()
+    assert "img.shields.io" not in (site.OUT / "guide.md").read_text(encoding="utf-8")
+    for page in ("mentions-legales.md", "confidentialite.md"):
+        assert f"]({page})" in conf or page in conf

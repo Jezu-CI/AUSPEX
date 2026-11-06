@@ -12,6 +12,7 @@ vers GitHub. --build lance ensuite « mkdocs build --strict » (liens vérifiés
 
 from __future__ import annotations
 
+import hashlib
 import json
 import posixpath
 import re
@@ -36,6 +37,13 @@ for doc in sorted((ROOT / "docs").glob("*.md")):
     PAGES.setdefault(f"docs/{doc.name}", f"documentation/{doc.name}")
 
 LINK = re.compile(r"(\]\()([^)\s]+)(\))")
+
+# Schémas Mermaid : pré-rendus en SVG (clair et sombre) et enregistrés dans le dépôt,
+# pour que le site ne charge aucun script tiers (confidentialité des visiteurs).
+# Régénération après modification d'un schéma : python tools/site.py --diagrammes
+DIAGRAMMES = ROOT / "site" / "assets" / "diagrammes"
+MERMAID = re.compile(r"^```mermaid\n(.*?)^```\n", re.M | re.S)
+BADGES = re.compile(r"^\[!\[[^\n]*\n", re.M)
 
 # Description de chaque page assemblée (balise meta description, aperçus de partage) :
 # une phrase précise, avec les mots que cherchent les visiteurs.
@@ -129,6 +137,73 @@ def faq() -> str:
     return "\n".join(lines)
 
 
+def diagram_id(source: str) -> str:
+    return hashlib.sha256(source.strip().encode("utf-8")).hexdigest()[:16]
+
+
+def diagrams(text: str, page: str) -> str:
+    """Remplace chaque schéma Mermaid par ses images pré-rendues (claire et sombre)."""
+    def repl(m: re.Match) -> str:
+        ident = diagram_id(m.group(1))
+        rel = posixpath.relpath("assets/diagrammes", posixpath.dirname(page) or ".")
+        return (f"![Schéma]({rel}/{ident}-clair.svg#only-light){{ .ax-schema }}\n"
+                f"![Schéma]({rel}/{ident}-sombre.svg#only-dark){{ .ax-schema }}\n")
+    return MERMAID.sub(repl, text)
+
+
+def all_diagrams() -> dict[str, str]:
+    """Schémas Mermaid de toutes les sources du site : identifiant → source."""
+    sources = [ROOT / src for src in PAGES] + list((ROOT / "site").rglob("*.md"))
+    return {diagram_id(m.group(1)): m.group(1) for f in sources
+            for m in MERMAID.finditer(f.read_text(encoding="utf-8"))}
+
+
+def intrinsic_size(svg: str) -> str:
+    """Taille propre du schéma (largeur et hauteur du viewBox) : affiché en <img>, il garde
+    ses proportions naturelles au lieu d'occuper toute la largeur de la page."""
+    box = re.search(r'viewBox="[\d.-]+ [\d.-]+ ([\d.]+) ([\d.]+)"', svg)
+    if not box:
+        return svg
+    w, h = (round(float(v)) for v in box.groups())
+    return re.sub(r'^(<svg[^>]*?) width="100%"', rf'\1 width="{w}" height="{h}"', svg, count=1)
+
+
+def render_diagrams() -> int:
+    """Pré-rend les schémas avec Mermaid CLI (mmdc) ; supprime les rendus orphelins."""
+    DIAGRAMMES.mkdir(parents=True, exist_ok=True)
+    wanted = all_diagrams()
+    for ident, source in wanted.items():
+        src = DIAGRAMMES / f"{ident}.mmd"
+        src.write_text(source, encoding="utf-8")
+        for variante, theme in (("clair", "neutral"), ("sombre", "dark")):
+            out = DIAGRAMMES / f"{ident}-{variante}.svg"
+            if out.exists():
+                continue
+            if subprocess.call(["mmdc", "-q", "-i", str(src), "-o", str(out), "-t", theme,
+                                "-b", "transparent"]) != 0:
+                return 1
+            out.write_text(intrinsic_size(out.read_text(encoding="utf-8")), encoding="utf-8")
+        src.unlink()
+    for f in DIAGRAMMES.glob("*.svg"):
+        if f.name.split("-")[0] not in wanted:
+            f.unlink()
+    print(f"Schémas pré-rendus : {len(wanted)}")
+    return 0
+
+
+# Ressources tierces interdites dans les pages publiées (aucune requête vers un autre site)
+EXTERNAL = re.compile(r'<(?:script|img|iframe)[^>]+src="https?://|<link[^>]+rel="(?:stylesheet|preconnect|preload|dns-prefetch)"[^>]+href="https?://'
+                      r'|<link[^>]+href="https?://[^"]+"[^>]+rel="(?:stylesheet|preconnect|preload)"|class="mermaid"')
+
+
+def external_resources(site_dir: Path) -> list[str]:
+    found = []
+    for page in site_dir.rglob("*.html"):
+        for m in EXTERNAL.finditer(page.read_text(encoding="utf-8")):
+            found.append(f"{page.relative_to(site_dir)} : {m.group(0)[:90]}")
+    return found
+
+
 def gallery() -> str:
     shots = json.loads((ROOT / "site/assets/captures/index.json").read_text(encoding="utf-8"))
     lines = ["---", "title: Captures d'écran",
@@ -157,17 +232,32 @@ def assemble() -> None:
         dest = OUT / page
         dest.parent.mkdir(parents=True, exist_ok=True)
         text = rewrite((ROOT / src).read_text(encoding="utf-8"), src, page)
-        dest.write_text(with_description(text, page), encoding="utf-8")
+        if page == "guide.md":
+            text = BADGES.sub("", text)  # badges du README : images hébergées ailleurs
+        dest.write_text(with_description(diagrams(text, page), page), encoding="utf-8")
+    for page in OUT.rglob("*.md"):
+        text = page.read_text(encoding="utf-8")
+        if "```mermaid" in text:
+            page.write_text(diagrams(text, page.relative_to(OUT).as_posix()), encoding="utf-8")
     (OUT / "captures.md").write_text(gallery(), encoding="utf-8")
     (OUT / "faq.md").write_text(faq(), encoding="utf-8")
     (OUT / "faq.yaml").unlink()
 
 
 def main(argv: list[str]) -> int:
+    if "--diagrammes" in argv:
+        return render_diagrams()
     assemble()
     print(f"Sources du site : {OUT.relative_to(ROOT)} ({sum(1 for _ in OUT.rglob('*.md'))} pages)")
     if "--build" in argv:
-        return subprocess.call(["mkdocs", "build", "--strict", "-f", str(ROOT / "mkdocs.yml")], cwd=ROOT)
+        code = subprocess.call(["mkdocs", "build", "--strict", "-f", str(ROOT / "mkdocs.yml")], cwd=ROOT)
+        if code:
+            return code
+        tiers = external_resources(ROOT / "build" / "site")
+        if tiers:
+            print("Ressources tierces dans le site (interdit) :", *tiers, sep="\n  ")
+            return 1
+        print("Aucune ressource tierce : aucune requête vers un autre site.")
     return 0
 
 
