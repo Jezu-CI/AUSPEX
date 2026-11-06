@@ -1,6 +1,11 @@
 {#- Référencement : aperçus de partage (Open Graph, cartes sociales) et données structurées (schema.org) -#}
 {% extends "base.html" %}
 
+{% block styles %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ config.extra.css | url }}">
+{% endblock %}
+
 {% block extrahead %}
   {%- set titre = page.meta.title if page and page.meta and page.meta.title else (page.title if page and page.title else config.site_name) -%}
   {%- set desc = page.meta.description if page and page.meta and page.meta.description else config.site_description -%}

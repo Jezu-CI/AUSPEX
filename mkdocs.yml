@@ -44,9 +44,10 @@ extra:
   verification:
     google: "0pBErC9t88SAE8dKyzBiPwGvyBGDK4e86Kzn9XaTHUk"
     bing: ""
+  css: !ENV [AUSPEX_CSS, "assets/auspex.css"]
 
-extra_css:
-  - assets/auspex.css
+# Feuille de style du site : nom avec empreinte du contenu (tools/site.py), pour qu'un
+# navigateur ne garde jamais une ancienne version en cache (voir overrides/main.html)
 
 plugins:
   - search:
