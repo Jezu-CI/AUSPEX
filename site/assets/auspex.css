@@ -38,3 +38,6 @@
 .ax-hero h1 { color: var(--md-default-fg-color); }
 .md-typeset .md-button:not(.md-button--primary) { color: #12805a; border-color: #12805a; }
 [data-md-color-scheme="slate"] .md-typeset .md-button:not(.md-button--primary) { color: #3ddc84; border-color: #3ddc84; }
+
+.md-typeset p:has(> img.ax-schema) { text-align: center; }
+.md-typeset img.ax-schema { max-width: 100%; height: auto; }
