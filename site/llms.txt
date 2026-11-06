@@ -1,0 +1,29 @@
+# Auspex
+
+> Auspex est une CMDB passive open source pour les réseaux IT et industriels (OT/ICS) : inventaire des actifs et contrôle de la segmentation réseau par écoute passive (port miroir ou TAP), sans agent, sans compte de service et sans émettre de paquet. Construit sur NetBox et Zeek (analyseurs ICSNPP), il produit des exports d'audit signés pour NIS2, DORA et IEC 62443. Licence GNU AGPL v3. Conçu par Yann Mathon.
+> Auspex is an open-source passive CMDB for IT and OT/ICS networks: agentless asset inventory and segmentation control from mirrored traffic, built on NetBox and Zeek, with signed audit evidence for NIS2, DORA and IEC 62443.
+
+Documentation en français ; résumé en anglais disponible.
+
+## Pages principales
+
+- [Accueil](https://jezu-ci.github.io/AUSPEX/): présentation, fonctionnalités, fonctionnement
+- [Questions fréquentes](https://jezu-ci.github.io/AUSPEX/faq/): écoute passive, protocoles industriels, segmentation, conformité, licence, prérequis
+- [Guide](https://jezu-ci.github.io/AUSPEX/guide/): installation du central, capteurs, règles de flux, identification, commandes
+- [Télécharger](https://jezu-ci.github.io/AUSPEX/telecharger/): fichiers de version, vérification Sigstore et SLSA, prérequis
+- [English summary](https://jezu-ci.github.io/AUSPEX/en/): the project in English
+
+## Documentation
+
+- [Authentification et accès](https://jezu-ci.github.io/AUSPEX/documentation/01-authentification/): MFA, WebAuthn, carte à puce, LDAPS, OIDC, SAML
+- [Capteurs](https://jezu-ci.github.io/AUSPEX/documentation/02-capteur/): Zeek et ICSNPP, appliance ISO, mises à jour signées
+- [Exports d'audit](https://jezu-ci.github.io/AUSPEX/documentation/03-audits/): NIS2, DORA, IEC 62443, signature et vérification
+- [Exploitation](https://jezu-ci.github.io/AUSPEX/documentation/04-exploitation/): installation, mise à jour, sauvegardes, dépannage
+- [Référence de configuration](https://jezu-ci.github.io/AUSPEX/documentation/05-configuration/): chaque clé, sorties SIEM
+- [Preuves automatisées](https://jezu-ci.github.io/AUSPEX/documentation/06-preuves-ci/): ce que la CI vérifie à chaque modification
+
+## Projet
+
+- [À propos](https://jezu-ci.github.io/AUSPEX/a-propos/): auteur, méthode de développement, licence
+- [Sécurité](https://jezu-ci.github.io/AUSPEX/securite/): signalement des vulnérabilités, limites connues
+- [Code source](https://github.com/Jezu-CI/AUSPEX)

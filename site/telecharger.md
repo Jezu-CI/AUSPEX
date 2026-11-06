@@ -1,5 +1,6 @@
 ---
-title: Télécharger
+title: Télécharger Auspex
+description: "Télécharger Auspex : installer le central NetBox + Auspex, appliance ISO du capteur passif, vérification des signatures Sigstore et de la provenance SLSA, prérequis."
 ---
 
 # Télécharger Auspex
