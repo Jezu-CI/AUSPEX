@@ -161,3 +161,17 @@ def test_privacy_settings():
     assert "img.shields.io" not in (site.OUT / "guide.md").read_text(encoding="utf-8")
     for page in ("mentions-legales.md", "confidentialite.md"):
         assert f"]({page})" in conf or page in conf
+
+
+def test_audience_chooser_on_home():
+    """Accueil : choix du public (utilisateur ou technique), cibles présentes dans le site,
+    et aiguillage vers le guide utilisateur en tête des pages techniques."""
+    home = (ROOT / "site/index.md").read_text(encoding="utf-8")
+    targets = re.findall(r'<a class="ax-choix-carte" href="([^"]+)"', home)
+    assert targets == ["utilisateur/", "guide/"]
+    site = _site()
+    site.assemble()
+    assert (site.OUT / "utilisateur/index.md").is_file() and (site.OUT / "guide.md").is_file()
+    for page in ("guide.md", "documentation/index.md"):
+        text = (site.OUT / page).read_text(encoding="utf-8")
+        assert "Vous voulez utiliser Auspex" in text and "utilisateur/index.md" in text

@@ -90,6 +90,14 @@ def rewrite(text: str, source: str, page: str) -> str:
     return LINK.sub(repl, text)
 
 
+# Aiguillage en tête des pages techniques : le lecteur non technique trouve le guide utilisateur
+AIGUILLAGE = {
+    page: '!!! tip "Vous voulez utiliser Auspex, pas entrer dans la technique ?"\n'
+          f'    Le [guide utilisateur]({posixpath.relpath("utilisateur/index.md", posixpath.dirname(page) or ".")}) '
+          "explique tout en langage simple : mise en route, tableau de bord, écarts, rapports d'audit."
+    for page in ("guide.md", "documentation/index.md")
+}
+
 # Titre de l'onglet et des résultats de recherche (le menu garde son libellé court)
 TITLES = {
     "guide.md": "Guide d'installation et d'utilisation",
@@ -234,6 +242,8 @@ def assemble() -> None:
         text = rewrite((ROOT / src).read_text(encoding="utf-8"), src, page)
         if page == "guide.md":
             text = BADGES.sub("", text)  # badges du README : images hébergées ailleurs
+        if page in AIGUILLAGE:
+            text = re.sub(r"^(# .*\n)", lambda m: m.group(1) + "\n" + AIGUILLAGE[page] + "\n", text, count=1, flags=re.M)
         dest.write_text(with_description(diagrams(text, page), page), encoding="utf-8")
     for page in OUT.rglob("*.md"):
         text = page.read_text(encoding="utf-8")
