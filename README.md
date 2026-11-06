@@ -7,7 +7,7 @@
 [![Licence AGPL v3](https://img.shields.io/badge/licence-AGPL%20v3-blue)](LICENSE)
 [![Site](https://img.shields.io/badge/site-jezu--ci.github.io%2FAUSPEX-12805a)](https://jezu-ci.github.io/AUSPEX/)
 
-*CMDB open source, passive, pour l'IT et l'OT*
+*CMDB open source passive IT/OT — v0.1 « Silence Before Dawn »*
 
 **Site du projet : [jezu-ci.github.io/AUSPEX](https://jezu-ci.github.io/AUSPEX/)** — documentation, captures d'écran, téléchargement.
 
