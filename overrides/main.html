@@ -1,0 +1,96 @@
+{#- Référencement : aperçus de partage (Open Graph, cartes sociales) et données structurées (schema.org) -#}
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {%- set titre = page.meta.title if page and page.meta and page.meta.title else (page.title if page and page.title else config.site_name) -%}
+  {%- set desc = page.meta.description if page and page.meta and page.meta.description else config.site_description -%}
+  {%- set image = config.site_url ~ "assets/auspex-apercu-social.png" -%}
+  <meta name="author" content="Yann Mathon">
+  {%- if config.extra.verification and config.extra.verification.google %}
+  <meta name="google-site-verification" content="{{ config.extra.verification.google }}">
+  {%- endif %}
+  {%- if config.extra.verification and config.extra.verification.bing %}
+  <meta name="msvalidate.01" content="{{ config.extra.verification.bing }}">
+  {%- endif %}
+  <meta property="og:type" content="{{ 'website' if page and page.is_homepage else 'article' }}">
+  <meta property="og:site_name" content="Auspex">
+  <meta property="og:locale" content="{{ 'en_US' if page and page.meta and page.meta.lang == 'en' else 'fr_FR' }}">
+  <meta property="og:title" content="{{ titre | striptags }}">
+  <meta property="og:description" content="{{ desc }}">
+  {%- if page and page.canonical_url %}
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  {%- endif %}
+  <meta property="og:image" content="{{ image }}">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="Auspex, CMDB passive IT/OT : inventaire des actifs et contrôle de la segmentation par écoute passive">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ titre | striptags }}">
+  <meta name="twitter:description" content="{{ desc }}">
+  <meta name="twitter:image" content="{{ image }}">
+  {%- if page and page.meta and page.meta.lang == 'en' %}
+  <link rel="alternate" hreflang="fr" href="{{ config.site_url }}">
+  <link rel="alternate" hreflang="en" href="{{ page.canonical_url }}">
+  {%- elif page and page.is_homepage %}
+  <link rel="alternate" hreflang="fr" href="{{ config.site_url }}">
+  <link rel="alternate" hreflang="en" href="{{ config.site_url }}en/">
+  <link rel="alternate" hreflang="x-default" href="{{ config.site_url }}">
+  {%- endif %}
+  {%- if page and page.is_homepage %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "{{ config.site_url }}#logiciel",
+        "name": "Auspex",
+        "alternateName": "Auspex CMDB passive IT/OT",
+        "description": {{ config.site_description | tojson }},
+        "url": "{{ config.site_url }}",
+        "applicationCategory": "SecurityApplication",
+        "applicationSubCategory": "CMDB, inventaire des actifs, sécurité OT/ICS",
+        "operatingSystem": "Linux",
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+        "isAccessibleForFree": true,
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
+        "image": "{{ config.site_url }}assets/auspex-apercu-social.png",
+        "screenshot": "{{ config.site_url }}assets/captures/12-tableau-de-bord.png",
+        "softwareHelp": "{{ config.site_url }}guide/",
+        "downloadUrl": "https://github.com/Jezu-CI/AUSPEX/releases/latest",
+        "codeRepository": "https://github.com/Jezu-CI/AUSPEX",
+        "programmingLanguage": "Python",
+        "inLanguage": ["fr", "en"],
+        "keywords": "CMDB, inventaire des actifs, écoute passive, OT, ICS, SCADA, segmentation réseau, NetBox, Zeek, NIS2, DORA, IEC 62443, Modbus, S7comm, DNP3, BACnet, OPC UA, EtherNet/IP, PROFINET",
+        "featureList": [
+          "Inventaire des actifs IT et OT par écoute passive, sans agent",
+          "Identification du système, du fabricant, du modèle, du firmware et du rôle",
+          "Contrôle continu de la segmentation réseau entre zones",
+          "Exports d'audit signés pour NIS2, DORA et IEC 62443",
+          "Intégration à NetBox",
+          "Alertes vers le SIEM (syslog CEF ou JSON, webhook)",
+          "Appliance capteur durcie qui n'émet aucun paquet sur l'écoute"
+        ],
+        "author": {"@id": "{{ config.site_url }}a-propos/#auteur"}
+      },
+      {
+        "@type": "Person",
+        "@id": "{{ config.site_url }}a-propos/#auteur",
+        "name": "Yann Mathon",
+        "jobTitle": "Consultant en cybersécurité",
+        "url": "https://github.com/Jezu-CI",
+        "sameAs": ["https://github.com/Jezu-CI"]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "{{ config.site_url }}#site",
+        "name": "Auspex",
+        "url": "{{ config.site_url }}",
+        "inLanguage": "fr",
+        "publisher": {"@id": "{{ config.site_url }}a-propos/#auteur"}
+      }
+    ]
+  }
+  </script>
+  {%- endif %}
+{% endblock %}

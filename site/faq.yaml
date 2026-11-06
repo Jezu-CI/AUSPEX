@@ -1,0 +1,75 @@
+# Questions fréquentes : page faq.md et données structurées FAQPage générées par tools/site.py.
+# Réponses en Markdown simple (liens relatifs vers les pages du site).
+- q: Qu'est-ce qu'Auspex ?
+  a: >-
+    Auspex est une **CMDB passive pour les environnements IT et industriels (OT)**, open source.
+    Il dresse l'inventaire des actifs et contrôle la segmentation du réseau **en écoutant le
+    trafic** (port miroir ou TAP), sans agent, sans compte de service et sans émettre un seul
+    paquet sur les réseaux surveillés. Il s'appuie sur NetBox et sur Zeek.
+- q: Auspex envoie-t-il du trafic sur le réseau surveillé ?
+  a: >-
+    Non. Le capteur ne fait qu'écouter une copie du trafic : l'interface d'écoute de
+    l'appliance n'émet rien, et la CI le vérifie à chaque modification en
+    démarrant l'appliance en machine virtuelle ([preuves automatisées](documentation/06-preuves-ci.md)).
+    C'est essentiel en OT, où un balayage actif peut perturber des automates fragiles.
+- q: Quelle différence avec un scanner réseau actif comme Nmap ?
+  a: >-
+    Un scanner interroge les équipements ; Auspex observe les échanges qu'ils ont déjà.
+    Aucun risque de perturber un automate, aucune fenêtre de maintenance à prévoir. En
+    contrepartie, Auspex ne voit que ce qui passe par les liens écoutés : un équipement qui ne
+    communique jamais sur ces liens n'apparaît pas.
+- q: Quels protocoles industriels Auspex reconnaît-il ?
+  a: >-
+    Grâce aux analyseurs ICSNPP de la CISA intégrés à Zeek : **EtherNet/IP (CIP), S7comm,
+    Modbus, DNP3, BACnet, OPC UA, OMRON FINS, HART-IP, GE SRTP et PROFINET**, en plus des
+    protocoles IT courants. Les règles d'identification sont vérifiées sur des captures
+    industrielles publiques réelles.
+- q: Quelles informations Auspex identifie-t-il sur un équipement ?
+  a: >-
+    Le système, le fabricant, le modèle, le firmware et le rôle (automate, IHM, station
+    d'ingénierie, passerelle, serveur…), chacun avec un **score de confiance** et la liste
+    des indices observés. Par exemple : automates Siemens, superviseurs Niagara, passerelles
+    HART, équipements Moxa, Hirschmann ou RUGGEDCOM.
+- q: Comment Auspex contrôle-t-il la segmentation réseau ?
+  a: >-
+    Les flux autorisés entre zones sont déclarés dans un fichier CSV ou Excel. Chaque flux
+    observé est comparé à ces règles : flux non déclarés, règles expirées encore utilisées,
+    administration depuis une zone moins sensible, flux IT vers OT qui contournent la DMZ
+    industrielle. Chaque écart est signalé dans NetBox et peut partir en alerte vers le SIEM.
+- q: Auspex aide-t-il à la conformité NIS2, DORA ou IEC 62443 ?
+  a: >-
+    Il fournit des **preuves** : des exports d'audit signés par référentiel, avec un constat
+    par exigence, vérifiables sans Auspex ([exports d'audit](documentation/03-audits.md)).
+    Chaque écart porte ses références réglementaires. Auspex ne rend pas conforme à lui
+    seul : il documente l'inventaire et la segmentation, deux exigences centrales de ces textes.
+- q: Faut-il NetBox pour utiliser Auspex ?
+  a: >-
+    Oui. Auspex s'installe avec NetBox (fourni par l'installation) et écrit l'inventaire
+    observé à côté de l'inventaire déclaré, avec les écarts entre les deux. Tableau de bord,
+    carte interactive et contrôle d'accès renforcé (MFA, clé de sécurité, carte à puce, LDAPS,
+    OIDC, SAML) sont intégrés.
+- q: Auspex envoie-t-il des alertes vers un SIEM ?
+  a: >-
+    Oui : syslog (UDP, TCP ou TLS, au format CEF ou JSON), webhook HTTPS ou fichier JSONL
+    ([référence de configuration](documentation/05-configuration.md)).
+- q: Auspex est-il gratuit ?
+  a: >-
+    Oui. Auspex est un logiciel libre sous **licence GNU AGPL v3**, avec une mention
+    d'attribution à conserver. Toute version modifiée mise à disposition d'autres personnes,
+    y compris comme service en ligne, doit publier son code source.
+- q: Quels sont les prérequis ?
+  a: >-
+    Le central : une machine Linux avec Docker et Docker Compose v2 (2 vCPU, 4 Go de RAM).
+    Le capteur : l'appliance ISO sur une machine x86-64 avec 2 Go de RAM et deux cartes réseau
+    (administration et écoute), ou l'image Docker sur un Linux relié à un port miroir
+    ([télécharger](telecharger.md)).
+- q: Comment vérifier que les fichiers téléchargés sont authentiques ?
+  a: >-
+    Chaque version est signée avec Sigstore par le workflow de publication du dépôt et
+    accompagnée d'une attestation de provenance (SLSA). La vérification se fait en une commande
+    ([vérifier un fichier](telecharger.md#vérifier-un-fichier-téléchargé)).
+- q: Qui développe Auspex ?
+  a: >-
+    Auspex est conçu par Yann Mathon, consultant en cybersécurité. Le code est développé avec
+    l'assistance de Claude (Anthropic) ; sa qualité est garantie par des tests automatisés
+    exécutés sur le vrai produit à chaque modification ([à propos](a-propos.md)).

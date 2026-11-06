@@ -1,5 +1,6 @@
 ---
-title: Auspex — CMDB passive IT/OT
+title: Auspex — CMDB passive IT/OT open source (NetBox, Zeek)
+description: "Auspex, CMDB passive open source pour l'IT et l'OT : inventaire des actifs et contrôle de la segmentation réseau par écoute passive, sans agent, avec NetBox et Zeek. Preuves NIS2, DORA, IEC 62443."
 hide:
   - navigation
   - toc
@@ -19,7 +20,7 @@ compte de service, sans émettre un seul paquet sur les réseaux surveillés.
 [Documentation](guide.md){ .md-button }
 [Code source](https://github.com/Jezu-CI/AUSPEX){ .md-button }
 
-<small>Open source, licence AGPL v3 · conçu par Yann Mathon</small>
+<small>Open source, licence AGPL v3 · conçu par Yann Mathon · [English summary](en/index.md){ hreflang=en lang=en }</small>
 
 </div>
 
