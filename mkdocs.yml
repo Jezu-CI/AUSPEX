@@ -40,7 +40,7 @@ theme:
 # coller ici le code fourni par chaque outil (méthode « balise HTML »).
 extra:
   verification:
-    google: ""
+    google: "0pBErC9t88SAE8dKyzBiPwGvyBGDK4e86Kzn9XaTHUk"
     bing: ""
 
 extra_css:
