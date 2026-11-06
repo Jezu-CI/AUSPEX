@@ -228,3 +228,25 @@ def test_mfa_config_ca_file(tmp_path):
     assert a.mail.ca_file == str(tmp_path / "ca-interne.pem")
     with pytest.raises(ConfigError, match="ca_file : fichier introuvable"):
         _cfg(tmp_path, {"methods": ["email"], "email": {"smtp_server": "s", "from": "a@b.fr", "ca_file": "absent.pem"}})
+
+
+def test_recovery_hashes_salted_and_stretched():
+    """Empreintes des codes de secours : scrypt avec un sel propre à chaque code,
+    jamais le code en clair, jamais deux fois la même empreinte."""
+    codes, hashes = mfa.new_recovery_codes()
+    assert all(h.startswith("scrypt$") and len(h.split("$")) == 3 for h in hashes)
+    assert len({h.split("$")[1] for h in hashes}) == len(hashes)          # sels distincts
+    _, again = mfa.new_recovery_codes()
+    assert mfa._hash_recovery(codes[0]) != mfa._hash_recovery(codes[0])  # même code, empreintes différentes
+    assert not any(c.replace("-", "") in "".join(hashes) for c in codes)
+
+
+def test_recovery_legacy_sha256_still_accepted():
+    """Codes distribués avant la 0.2.0 (SHA-256 sans sel) : encore utilisables, une seule fois."""
+    import hashlib
+    code = "abcde-fghij"
+    legacy = hashlib.sha256(b"auspex-recovery:abcdefghij").hexdigest()
+    left = mfa.use_recovery_code(code, [legacy, mfa._hash_recovery("zzzzz-zzzzz")])
+    assert left is not None and len(left) == 1 and left[0].startswith("scrypt$")
+    assert mfa.use_recovery_code(code, left) is None
+    assert mfa.use_recovery_code(code, ["scrypt$zz$00"]) is None             # empreinte corrompue

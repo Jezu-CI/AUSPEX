@@ -74,7 +74,8 @@ def generate(out: Path, days: int = 7, seed: int = 42) -> None:
     w = Writer(out)
     for d in range(days):
         day = START + timedelta(days=d)
-        t = lambda h, m=0: day + timedelta(hours=h, minutes=m, seconds=random.randint(0, 59))
+        def t(h, m=0, day=day):
+            return day + timedelta(hours=h, minutes=m, seconds=random.randint(0, 59))
 
         # DHCP du matin
         for pc in PCS:

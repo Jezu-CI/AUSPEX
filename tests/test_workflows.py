@@ -214,7 +214,7 @@ def test_project_installs_never_download_build_tools():
     """Toute installation du projet (-e .) se fait sans isolation de construction,
     après avoir installé requirements/construction.txt dans la même commande."""
     seen = 0
-    for f, name, wdir, run in _run_steps_with_dir():
+    for f, name, _wdir, run in _run_steps_with_dir():
         for line in run.splitlines():
             if re.search(r"pip install( -q)? --no-deps", line):
                 seen += 1

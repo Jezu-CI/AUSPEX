@@ -11,7 +11,6 @@ Usage (dans deploy/, après ci_mfa.py) : python ../tools/ci_ldap.py
 
 from __future__ import annotations
 
-import json
 import re
 import secrets
 import shutil
@@ -24,7 +23,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ci_mfa import ADMIN, CONFIG, ENV, PAGE, SETUP_PATH, URL, Browser, api, mfa  # noqa: E402
+from ci_mfa import CONFIG, ENV, PAGE, SETUP_PATH, URL, Browser, api, mfa  # noqa: E402
 
 BASE = "dc=ville,dc=test"
 LDAP_ADMIN = f"cn=admin,{BASE}"
