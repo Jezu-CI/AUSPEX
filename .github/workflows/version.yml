@@ -41,10 +41,10 @@ jobs:
       tag: ${{ steps.v.outputs.tag }}
       publier: ${{ steps.v.outputs.publier }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Version cohérente (code, journal, tag)
@@ -93,7 +93,7 @@ jobs:
           printf '\n---\nVérifier l'"'"'origine et l'"'"'intégrité des fichiers : [Télécharger → Vérifier](%s). Commit : %s\n' "$VERIFIER" "$GITHUB_SHA" >> version/NOTES.md
           (cd version && sha256sum auspex-* > SHA256SUMS && cat SHA256SUMS)
       - name: Fichiers construits (transmis au job de signature)
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: version-construite
           path: version/
@@ -112,7 +112,7 @@ jobs:
     # Aucune installation ni exécution du code du projet ou de ses dépendances
     # ici : seulement cosign, l'attestation, gh et le script de vérification.
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: tools/verifier-version.sh
@@ -128,7 +128,7 @@ jobs:
             echo "::error::la version $TAG existe déjà (brouillon ou publiée)"; exit 1
           fi
       - name: Fichiers construits
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: version-construite
           path: version
@@ -180,7 +180,7 @@ jobs:
           echo "::notice title=Brouillon prêt::Releases → $TAG : relire puis « Publish release »"
       - name: Fichiers de la version (sans brouillon)
         if: needs.construire.outputs.publier != 'true'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: version
           path: version/
