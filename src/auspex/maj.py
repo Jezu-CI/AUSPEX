@@ -73,7 +73,11 @@ def render_manifest(version: str, sha256: str, size: int, published: datetime | 
 
 def parse_manifest(data: bytes) -> dict[str, str]:
     out = {}
-    for line in data.decode("ascii").splitlines():
+    try:
+        text = data.decode("ascii")
+    except UnicodeDecodeError:
+        raise MajError("manifeste mal formé (caractères non ASCII)") from None
+    for line in text.splitlines():
         m = re.fullmatch(r"([a-z0-9_]+)=([A-Za-z0-9.:/_+-]{1,128})", line)
         if not m:
             raise MajError("manifeste mal formé")

@@ -10,6 +10,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,6 +68,14 @@ def file_identity(path: str | Path) -> str | None:
     return None
 
 
+def _separator(value: str) -> str:
+    """Séparateur d'un en-tête « #separator » : \\xHH (forme écrite par Zeek) ou un caractère."""
+    m = re.fullmatch(r"\\x([0-9a-fA-F]{2})", value)
+    if m:
+        return chr(int(m.group(1), 16)) if m.group(1) != "00" else ""
+    return value if len(value) == 1 else ""
+
+
 def read_log(path: str | Path, start: int = 0, progress: dict | None = None) -> Iterator[dict]:
     """Itère sur les enregistrements d'un log Zeek, quel que soit le format.
 
@@ -86,14 +95,20 @@ def read_log(path: str | Path, start: int = 0, progress: dict | None = None) -> 
             continue
         if line.startswith("#"):
             # Les en-têtes TSV sont toujours relus : ils décrivent les colonnes.
+            # En-têtes venus d'un capteur : un en-tête abîmé est ignoré, jamais fatal.
             if line.startswith("#separator"):
-                sep = line.split(" ", 1)[1].encode().decode("unicode_escape")
+                new_sep = _separator(line.split(" ", 1)[1] if " " in line else "")
+                if new_sep:
+                    sep = new_sep
             elif line.startswith("#fields"):
                 fields = line.split(sep)[1:]
-            elif line.startswith("#unset_field"):
-                unset = line.split(sep)[1]
-            elif line.startswith("#empty_field"):
-                empty = line.split(sep)[1]
+            elif line.startswith(("#unset_field", "#empty_field")):
+                parts = line.split(sep)
+                if len(parts) > 1:
+                    if line.startswith("#unset_field"):
+                        unset = parts[1]
+                    else:
+                        empty = parts[1]
             continue
         if pos < start:
             continue
@@ -162,17 +177,21 @@ def ts_of(rec: dict) -> datetime | None:
         return None
     try:
         return datetime.fromtimestamp(float(ts), tz=timezone.utc)
+    except (OverflowError, OSError):    # horodatage hors limites (journal abîmé ou forgé)
+        return None
     except (TypeError, ValueError):
         try:
-            return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
         except ValueError:
             return None
+        # Toujours avec fuseau (UTC par défaut) : comparable aux horodatages numériques
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 def _int(v) -> int | None:
     try:
         return int(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):   # OverflowError : Infinity en JSON
         return None
 
 
@@ -211,8 +230,11 @@ def aggregate_conn(records: Iterator[dict]) -> dict[tuple, Flow]:
     """Agrège des enregistrements conn.log en flux."""
     flows: dict[tuple, Flow] = {}
     for rec in records:
-        src, dst = rec.get("id.orig_h"), rec.get("id.resp_h")
-        proto = (rec.get("proto") or "").lower()
+        # Enregistrements venus d'un capteur : un champ du mauvais type est ignoré
+        src, dst, proto = rec.get("id.orig_h"), rec.get("id.resp_h"), rec.get("proto")
+        if not (isinstance(src, str) and isinstance(dst, str) and isinstance(proto, str)):
+            continue
+        proto = proto.lower()
         ts = ts_of(rec)
         if not (src and dst and proto and ts):
             continue
@@ -226,6 +248,8 @@ def aggregate_conn(records: Iterator[dict]) -> dict[tuple, Flow]:
         f.first_seen = min(f.first_seen, ts)
         f.last_seen = max(f.last_seen, ts)
         state = rec.get("conn_state", "")
+        if not isinstance(state, str):
+            state = ""
         if proto == "tcp" and state and state not in TCP_ESTABLISHED:
             f.attempts_rejected += 1
             if state in TCP_UNANSWERED:
