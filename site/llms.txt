@@ -8,6 +8,7 @@ Documentation en français ; résumé en anglais disponible.
 ## Pages principales
 
 - [Accueil](https://jezu-ci.github.io/AUSPEX/): présentation, fonctionnalités, fonctionnement
+- [Vidéo de démonstration](https://jezu-ci.github.io/AUSPEX/#video): deux minutes sur un vrai central (tableau de bord, écarts de segmentation, carte des flux, rapport d'audit NIS2 signé)
 - [Questions fréquentes](https://jezu-ci.github.io/AUSPEX/faq/): écoute passive, protocoles industriels, segmentation, conformité, licence, prérequis
 - [Guide utilisateur](https://jezu-ci.github.io/AUSPEX/utilisateur/): Auspex en langage simple : notions, mise en route, tableau de bord, écarts, carte, inventaire, règles de flux, capteurs, alertes, rapports d'audit
 - [Guide technique](https://jezu-ci.github.io/AUSPEX/guide/): installation du central, capteurs, règles de flux, identification, commandes

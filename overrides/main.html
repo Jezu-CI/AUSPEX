@@ -76,7 +76,20 @@
           "Alertes vers le SIEM (syslog CEF ou JSON, webhook)",
           "Appliance capteur durcie qui n'émet aucun paquet sur l'écoute"
         ],
-        "author": {"@id": "{{ config.site_url }}a-propos/#auteur"}
+        "author": {"@id": "{{ config.site_url }}a-propos/#auteur"},
+        "subjectOf": {"@id": "{{ config.site_url }}#video"}
+      },
+      {
+        "@type": "VideoObject",
+        "@id": "{{ config.site_url }}#video",
+        "name": "Auspex en vidéo : CMDB passive IT/OT en deux minutes",
+        "description": "Démonstration d'Auspex sur un vrai central avec sept jours de trafic d'un site IT et industriel : tableau de bord, écarts de segmentation, carte des flux, rapport d'audit NIS2 signé.",
+        "thumbnailUrl": "{{ config.site_url }}assets/video/auspex-demo-apercu.jpg",
+        "contentUrl": "{{ config.site_url }}assets/video/auspex-demo.mp4",
+        "uploadDate": "2026-11-13",
+        "duration": "PT1M46S",
+        "inLanguage": "fr",
+        "creator": {"@id": "{{ config.site_url }}a-propos/#auteur"}
       },
       {
         "@type": "Person",

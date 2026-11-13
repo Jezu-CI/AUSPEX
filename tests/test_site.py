@@ -101,7 +101,7 @@ def test_llms_txt_links_exist():
     links = re.findall(r"\(https://jezu-ci\.github\.io/AUSPEX/([^)]*)\)", text)
     assert len(links) >= 10
     for link in links:
-        path = link.rstrip("/")
+        path = link.split("#")[0].rstrip("/")  # ancre de section : on vérifie la page
         assert path == "" or (site.OUT / f"{path}.md").is_file() or (site.OUT / path / "index.md").is_file(), link
 
 

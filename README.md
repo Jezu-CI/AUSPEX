@@ -12,6 +12,10 @@
 
 **Site du projet : [jezu-ci.github.io/AUSPEX](https://jezu-ci.github.io/AUSPEX/)** — documentation, captures d'écran, téléchargement.
 
+[![Auspex en vidéo (2 minutes) : cliquer pour regarder](site/assets/video/auspex-demo-apercu.jpg)](https://jezu-ci.github.io/AUSPEX/#video)
+
+*▶ [Auspex en vidéo, en deux minutes](https://jezu-ci.github.io/AUSPEX/#video) : tableau de bord, écarts de segmentation, carte des flux, rapport d'audit NIS2 signé.*
+
 À Rome, l'auspex lisait les présages en observant le vol des oiseaux, sans
 jamais intervenir. C'est le principe de l'outil : tout voir, ne rien émettre.
 
