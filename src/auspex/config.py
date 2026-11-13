@@ -594,7 +594,20 @@ def _parse_mfa(raw, access: AccessConfig, problems: list[str], base_dir: Path) -
 
 
 def parse_config(raw: Any, base_dir: Path | str = ".") -> Config:
-    """Valide un dictionnaire (YAML déjà chargé) et renvoie un `Config`."""
+    """Valide un dictionnaire (YAML déjà chargé) et renvoie un `Config`.
+
+    Toute erreur de structure (une liste à la place d'un objet, un nombre à la place
+    d'un texte…) devient une ConfigError lisible, jamais une trace Python."""
+    try:
+        return _parse_config(raw, base_dir)
+    except ConfigError:
+        raise
+    except (AttributeError, TypeError, KeyError, ValueError, IndexError, OSError) as exc:
+        raise ConfigError([f"structure du fichier inattendue : {type(exc).__name__} ({exc}) ; "
+                           "vérifiez les types des rubriques (objet, liste, texte, nombre)"]) from exc
+
+
+def _parse_config(raw: Any, base_dir: Path | str = ".") -> Config:
     base_dir = Path(base_dir)
     problems: list[str] = []
     if not isinstance(raw, dict):
@@ -972,6 +985,8 @@ def load_config(path: str | Path) -> Config:
     path = Path(path)
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError:
+        raise ConfigError([f"{path} : fichier non UTF-8"]) from None
     except FileNotFoundError:
         raise ConfigError([f"{path} : fichier introuvable"]) from None
     except yaml.YAMLError as exc:

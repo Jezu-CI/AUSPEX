@@ -13,6 +13,7 @@ Format d'une ligne (en-têtes insensibles à la casse et aux accents) :
 from __future__ import annotations
 
 import csv
+import zipfile
 import hashlib
 import ipaddress
 import json
@@ -153,7 +154,7 @@ def _parse_ports(value: str) -> PortSpec | str:
                 lo, hi = (int(x) for x in part.split("-", 1))
             else:
                 lo = hi = int(float(part))  # Excel renvoie parfois 22.0
-        except ValueError:
+        except (ValueError, OverflowError):  # OverflowError : « inf »
             return f"port « {value} » invalide (attendu : 443, 8000-8100, 80;443 ou any)"
         if not (0 <= lo <= hi <= 65535):
             return f"port « {value} » hors limites (0 à 65535)"
@@ -203,7 +204,7 @@ def _rows_from_csv(path: Path, meta: dict) -> Iterable[tuple[int, dict]]:
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError:
-            text = raw.decode("cp1252")  # export Excel français
+            text = raw.decode("cp1252", errors="replace")  # export Excel français
     sample = text[:4096]
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
@@ -237,7 +238,9 @@ def _rows_from_xlsx(path: Path, meta: dict) -> Iterable[tuple[int, dict]]:
 
 
 def import_rules(path: str | Path, zone_names: Iterable[str]) -> ImportResult:
-    """Lit et valide un fichier CSV ou XLSX. N'écrit rien."""
+    """Lit et valide un fichier CSV ou XLSX. N'écrit rien.
+
+    Un fichier illisible ou abîmé donne un problème d'import, jamais une exception."""
     path = Path(path)
     zone_names = set(zone_names)
     meta: dict = {}
@@ -247,7 +250,15 @@ def import_rules(path: str | Path, zone_names: Iterable[str]) -> ImportResult:
         rows = _rows_from_csv(path, meta)
     else:
         return ImportResult([], [ImportProblem(0, "", f"extension {path.suffix} non supportée (.csv ou .xlsx)")])
+    try:
+        return _validate_rows(rows, zone_names, meta)
+    except csv.Error as exc:            # CSV illisible (caractère nul, champ démesuré…)
+        return ImportResult([], [ImportProblem(0, "", f"fichier CSV illisible : {exc}")])
+    except (zipfile.BadZipFile, KeyError, ValueError, OSError) as exc:   # classeur Excel abîmé
+        return ImportResult([], [ImportProblem(0, "", f"fichier illisible : {exc}")])
 
+
+def _validate_rows(rows: Iterable[tuple[int, dict]], zone_names: set[str], meta: dict) -> ImportResult:
     rules: list[FlowRule] = []
     problems: list[ImportProblem] = []
     seen: dict[str, int] = {}

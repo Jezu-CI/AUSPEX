@@ -10,6 +10,7 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 - **Codes de secours de la double authentification** : empreintes **scrypt** avec un sel propre à chaque code, au lieu de SHA-256 sans sel. Un vol de la base de données ne permet plus de retrouver les codes par recherche exhaustive. Les codes distribués avant la 0.2.0 restent valables jusqu'à leur utilisation.
 - **Analyse de code (linter)** : ruff vérifie à chaque modification les erreurs probables et pièges courants (règles dans `pyproject.toml`) ; corrections des points relevés (exceptions qui masquaient leur cause, fermetures sur une variable de boucle, imports inutiles).
+- **Fuzzing des analyseurs** (`fuzz/`, workflow hebdomadaire, Atheris si installé) : manifeste de mise à jour, journaux des capteurs, fichier des règles de flux, configuration. Il a révélé et fait corriger des plantages sur données abîmées ou forgées : manifeste non ASCII, en-têtes de journal Zeek incomplets, horodatages hors limites, champs du mauvais type, horodatages sans fuseau mêlés aux autres, fichier de règles hors encodage ou avec caractère nul, port « inf », configuration non UTF-8 ou de structure inattendue. Un journal envoyé par un capteur compromis ne peut plus interrompre le cycle d'analyse. Chaque cas est un test de non-régression.
 
 ### Changé
 

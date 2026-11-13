@@ -1,0 +1,3 @@
+id,source,destination,protocole,port,description,proprietaire,expire_le
+C-001,T1-serveurs,T0-AD,tcp,88,Kerberos,Equipe AD,
+C-014,10.9.0.0/24,OT-N2,tcp,22;80-81,Maintenance,Prestataire,15/12/2026
