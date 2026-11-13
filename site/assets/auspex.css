@@ -53,3 +53,8 @@
 .md-typeset .ax-choix-carte .ax-choix-icone { color: var(--md-accent-fg-color); line-height: 0; }
 .ax-choix-icone svg { width: 1.8rem; height: 1.8rem; fill: currentColor; }
 .md-typeset .ax-choix-carte .ax-choix-suite { margin-top: auto; font-weight: 600; color: var(--md-accent-fg-color); }
+
+/* Vidéo de démonstration (accueil) */
+.ax-video { max-width: 960px; margin: 1rem auto 0.4rem; }
+.ax-video video { display: block; width: 100%; height: auto; border-radius: 8px;
+  background: #12191c; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18); }

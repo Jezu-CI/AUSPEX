@@ -44,6 +44,24 @@ compte de service, sans émettre un seul paquet sur les réseaux surveillés.
 *À Rome, l'auspex lisait les présages en observant le vol des oiseaux, sans
 jamais intervenir. C'est le principe de l'outil : tout voir, ne rien émettre.*
 
+## Auspex en vidéo { #video }
+
+Deux minutes sur un vrai central, avec sept jours de trafic d'un site IT et
+industriel de démonstration : connexion, tableau de bord, écarts de
+segmentation, carte des flux, rapport d'audit NIS2 signé.
+
+<div class="ax-video">
+<video controls preload="none" playsinline width="1280" height="720"
+       poster="assets/video/auspex-demo-apercu.jpg">
+  <source src="assets/video/auspex-demo.mp4" type="video/mp4">
+  <a href="assets/video/auspex-demo.mp4">Télécharger la vidéo (MP4, 1,5 Mo)</a>
+</video>
+</div>
+
+<small>Vidéo hébergée sur ce site, sans service tiers ; elle ne se charge que
+si vous cliquez sur lecture. Elle est enregistrée automatiquement par
+l'intégration continue, à partir du produit réel.</small>
+
 ## Ce qu'Auspex apporte
 
 <div class="grid cards ax-cards" markdown>

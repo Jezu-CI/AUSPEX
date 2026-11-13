@@ -18,6 +18,20 @@ account, and not a single packet sent on the monitored networks.
 
 *The full documentation is in French. This page summarizes the project in English.*
 
+## Video tour { #video }
+
+Two minutes on a real Auspex server with seven days of traffic from an IT and
+industrial demo site: login, dashboard, segmentation findings, flow map,
+signed NIS2 audit report (captions in French).
+
+<div class="ax-video">
+<video controls preload="none" playsinline width="1280" height="720"
+       poster="../assets/video/auspex-demo-apercu.jpg">
+  <source src="../assets/video/auspex-demo.mp4" type="video/mp4">
+  <a href="../assets/video/auspex-demo.mp4">Download the video (MP4, 1.5 MB)</a>
+</video>
+</div>
+
 ## What Auspex does
 
 - **Observed, not declared, inventory.** Every asset seen on the network is
