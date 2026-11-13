@@ -31,10 +31,12 @@ from ci_mfa import ENV, URL, mfa  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = Path("demo")
-SIZE = {"width": 1280, "height": 720}     # taille de la vidéo
-# Fenêtre du navigateur plus petite que la vidéo : la page est agrandie d'environ 20 %,
-# textes et tableaux restent lisibles une fois la vidéo réduite sur un site ou un téléphone.
+# Fenêtre du navigateur réduite (1066 × 600) : la vidéo est enregistrée à cette taille puis
+# agrandie en 1280 × 720 par ffmpeg (workflow demo-video), soit une page agrandie d'environ
+# 20 % : textes et tableaux restent lisibles sur un site ou un téléphone. Enregistrer
+# directement en 1280 × 720 laisserait une bande grise : Playwright n'agrandit pas la page.
 VIEW = {"width": 1066, "height": 600}
+SIZE = VIEW
 ENROLLED_PERIOD = 0
 
 # Sous-titres et curseur, réinjectés à chaque page (la vidéo ne montre pas la souris).
