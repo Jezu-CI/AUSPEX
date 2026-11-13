@@ -235,3 +235,22 @@ def test_regeneration_tool_is_locked_and_fails_loudly():
     assert "| grep" not in sh          # plus de tube qui masquerait le code de retour
     figer = (REQ / "figer.txt").read_text(encoding="utf-8")
     assert re.search(r"^pip-tools==7\.4\.", figer, re.M) and re.search(r"^pip==24\.", figer, re.M)
+
+
+def test_pull_requests_always_run_required_tests():
+    """La protection de main exige les tests : chaque pull request doit les déclencher,
+    même si elle ne touche que la documentation (sinon le contrôle reste en attente)."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    on = wf.get("on", wf.get(True))
+    assert on["pull_request"] is None or not any(k in on["pull_request"] for k in ("paths", "paths-ignore"))
+    jobs = wf["jobs"]
+    tests = [j for j in jobs.values() if str(j.get("name", "")).startswith("Tests")]
+    assert tests and all("if" not in j for j in tests)
+
+
+@pytest.mark.parametrize("nom", ["ci.yml", "captures-reelles.yml"])
+def test_main_runs_never_cancelled(nom):
+    """Badges du README : une exécution sur main n'est jamais annulée par la suivante
+    (une annulation s'affiche « failing ») ; seules les exécutions de PR le sont."""
+    wf = yaml.safe_load((ROOT / ".github/workflows" / nom).read_text(encoding="utf-8"))
+    assert wf["concurrency"]["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
