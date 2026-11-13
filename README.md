@@ -1,6 +1,7 @@
 # Auspex
 
 [![CI](https://github.com/Jezu-CI/AUSPEX/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Jezu-CI/AUSPEX/actions/workflows/ci.yml)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16662/badge)](https://www.bestpractices.dev/projects/16662)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Jezu-CI/AUSPEX/badge)](https://scorecard.dev/viewer/?uri=github.com/Jezu-CI/AUSPEX)
 [![Captures réelles](https://github.com/Jezu-CI/AUSPEX/actions/workflows/captures-reelles.yml/badge.svg?branch=main)](https://github.com/Jezu-CI/AUSPEX/actions/workflows/captures-reelles.yml)
 [![Version](https://img.shields.io/github/v/release/Jezu-CI/AUSPEX?label=version)](https://github.com/Jezu-CI/AUSPEX/releases/latest)

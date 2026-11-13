@@ -136,3 +136,8 @@ annuaire et vrais fournisseurs d'identité, appliance démarrée en machine
 virtuelle (aucune trame émise sur l'écoute), et **captures industrielles
 réelles** (66 identifications attendues, faux positifs compris).
 [Le détail des preuves](documentation/06-preuves-ci.md).
+
+Les pratiques de sécurité du projet sont évaluées publiquement par l'OpenSSF
+(fondation de la Linux Foundation pour la sécurité de l'open source) :
+[fiche OpenSSF Best Practices](https://www.bestpractices.dev/projects/16662) et
+[analyse OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/Jezu-CI/AUSPEX).
