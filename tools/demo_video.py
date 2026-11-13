@@ -120,15 +120,24 @@ class Film:
             self.page.mouse.wheel(0, pixels / steps)
             time.sleep(seconds / steps)
 
-    def card(self, title: str, subtitle: str, seconds: float, extra: str = "") -> None:
+    def card(self, title: str, subtitle: str, seconds: float, extra: str = "",
+             signature: bool = False) -> None:
+        """Carte titre plein écran. signature=True ajoute en bas la signature Jezu-CI."""
         icon = (ROOT / "site/assets/auspex-icon.svg").read_text(encoding="utf-8")
+        sig = ""
+        if signature:
+            logo = (ROOT / "site/assets/jezu-ci-signature.svg").read_text(encoding="utf-8")
+            sig = f'<div class="sig"><span>un projet</span>{logo}</div>'
         self.page.set_content(f"""<!doctype html><html><head><meta charset="utf-8"><style>
           body{{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
           background:#12191c;color:#e8eef0;font-family:system-ui,Segoe UI,Roboto,sans-serif;text-align:center}}
           h1{{font-size:64px;margin:18px 0 8px}} p{{font-size:26px;color:#3ddc84;margin:0 0 10px}}
-          small{{font-size:19px;color:#9fb0b6}} .i svg{{width:120px;height:120px}}</style></head>
+          small{{font-size:19px;color:#9fb0b6}} .i svg{{width:120px;height:120px}}
+          .sig{{position:fixed;left:0;right:0;bottom:34px;display:flex;align-items:center;
+          justify-content:center;gap:2px;color:#9fb0b6;font-size:18px}}
+          .sig svg{{width:auto;height:68px}}</style></head>
           <body><div><div class="i">{icon}</div><h1>{html.escape(title)}</h1><p>{html.escape(subtitle)}</p>
-          {extra}</div></body></html>""")
+          {extra}</div>{sig}</body></html>""")
         time.sleep(seconds)
 
     def schema(self, svg: Path, caption: str, seconds: float) -> None:
@@ -273,8 +282,9 @@ def scenes(f: Film, page, secret: str) -> None:
     f.quiet()
 
     # 7. Fin
-    f.card("Auspex", "Open source · licence AGPL v3 · conçu par Yann Mathon", 5,
-           "<small>Documentation, téléchargement : jezu-ci.github.io/AUSPEX</small>")
+    f.card("Auspex", "Open source · licence AGPL v3 · conçu par Yann Mathon", 6,
+           "<small>Documentation, téléchargement : jezu-ci.github.io/AUSPEX</small>",
+           signature=True)
 
 
 
