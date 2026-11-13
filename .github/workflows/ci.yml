@@ -25,7 +25,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Sur une PR, une nouvelle poussée remplace l'exécution en cours ; sur main, chaque
+  # exécution va au bout (sinon le badge du README affiche « failing » pour une annulation)
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

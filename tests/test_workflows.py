@@ -246,3 +246,11 @@ def test_pull_requests_always_run_required_tests():
     jobs = wf["jobs"]
     tests = [j for j in jobs.values() if str(j.get("name", "")).startswith("Tests")]
     assert tests and all("if" not in j for j in tests)
+
+
+@pytest.mark.parametrize("nom", ["ci.yml", "captures-reelles.yml"])
+def test_main_runs_never_cancelled(nom):
+    """Badges du README : une exécution sur main n'est jamais annulée par la suivante
+    (une annulation s'affiche « failing ») ; seules les exécutions de PR le sont."""
+    wf = yaml.safe_load((ROOT / ".github/workflows" / nom).read_text(encoding="utf-8"))
+    assert wf["concurrency"]["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
