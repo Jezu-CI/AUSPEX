@@ -4,7 +4,7 @@
 #   - port carte à puce, si auth.carte est configurée : certificat client exigé
 #     et vérifié (autorités des cartes, révocation), transmis à NetBox avec un
 #     secret partagé.
-FROM nginxinc/nginx-unprivileged:1.27-alpine@sha256:65e3e85dbaed8ba248841d9d58a899b6197106c23cb0ff1a132b7bfe0547e4c0
+FROM nginxinc/nginx-unprivileged:1.31-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e
 
 COPY deploy/acces/nginx.conf /etc/auspex-acces-image/nginx.conf
 COPY deploy/acces/entrypoint.sh /usr/local/bin/auspex-acces
