@@ -13,7 +13,6 @@ Usage (dans deploy/) : python ../tools/captures.py
 from __future__ import annotations
 
 import json
-import re
 import secrets
 import subprocess
 import sys

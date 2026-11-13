@@ -2,7 +2,7 @@ from auspex.compliance import evaluate
 from auspex.flowrules import FlowRule, compile_rule
 from auspex.zeek import aggregate_conn, read_log
 from auspex.zones import ZoneMap
-from conftest import conn, write_jsonl
+from conftest import conn
 
 
 def rule(rid, src, dst, proto, port, expire=""):
@@ -138,7 +138,8 @@ def test_zeek_tsv_format(tmp_path):
 
 
 def test_zeek_json_gz(tmp_path, day):
-    import gzip, json
+    import gzip
+    import json
     p = tmp_path / "conn.12:00:00-13:00:00.log.gz"
     with gzip.open(p, "wt") as fh:
         fh.write(json.dumps(conn(day(0), "10.2.1.5", "10.1.0.10", 22)) + "\n")

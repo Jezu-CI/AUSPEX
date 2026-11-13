@@ -108,10 +108,31 @@ def _normalize_recovery(code: str) -> str:
     return (code or "").strip().lower().replace("-", "").replace(" ", "")
 
 
-def _hash_recovery(code: str) -> str:
-    # Codes aléatoires de 50 bits, essais limités par le verrouillage :
-    # une empreinte SHA-256 suffit (pas de mot de passe humain à protéger).
-    return hashlib.sha256(("auspex-recovery:" + _normalize_recovery(code)).encode()).hexdigest()
+# Empreinte d'un code de secours : scrypt (dérivation coûteuse en calcul et en mémoire)
+# avec un sel propre à chaque code. Les codes sont aléatoires (50 bits) et les essais en
+# ligne limités par le verrouillage ; scrypt protège en plus contre une recherche
+# exhaustive hors ligne si la base de données était volée.
+_SCRYPT = {"n": 2 ** 14, "r": 8, "p": 1, "dklen": 32, "maxmem": 64 * 1024 * 1024}
+
+
+def _hash_recovery(code: str, salt: bytes | None = None) -> str:
+    salt = salt if salt is not None else secrets.token_bytes(16)
+    digest = hashlib.scrypt(_normalize_recovery(code).encode(), salt=salt, **_SCRYPT)
+    return f"scrypt${salt.hex()}${digest.hex()}"
+
+
+def _recovery_matches(code: str, stored: str) -> bool:
+    if stored.startswith("scrypt$"):
+        try:
+            _, salt, _digest = stored.split("$")
+            expected = _hash_recovery(code, bytes.fromhex(salt))
+        except ValueError:
+            return False
+        return hmac.compare_digest(expected, stored)
+    # Ancien format (jusqu'à la 0.1.0) : SHA-256 sans sel, encore accepté pour ne pas
+    # invalider les codes déjà distribués ; remplacé à la prochaine inscription.
+    legacy = hashlib.sha256(("auspex-recovery:" + _normalize_recovery(code)).encode()).hexdigest()
+    return hmac.compare_digest(legacy, stored)
 
 
 def new_recovery_codes(n: int = RECOVERY_CODES) -> tuple[list[str], list[str]]:
@@ -127,11 +148,15 @@ def use_recovery_code(code: str, hashes: list[str]) -> list[str] | None:
     """Empreintes restantes si le code est valide (il est alors consommé), sinon None."""
     if len(_normalize_recovery(code)) != 10:
         return None
-    h = _hash_recovery(code)
-    match = [x for x in hashes if hmac.compare_digest(x, h)]
-    if not match:
+    match = None
+    for stored in hashes:              # chaque empreinte est vérifiée (durée indépendante de la position)
+        if _recovery_matches(code, stored) and match is None:
+            match = stored
+    if match is None:
         return None
-    return [x for x in hashes if x != match[0]]
+    left = list(hashes)
+    left.remove(match)
+    return left
 
 
 # --- Codes par e-mail -------------------------------------------------------------

@@ -973,7 +973,7 @@ def load_config(path: str | Path) -> Config:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        raise ConfigError([f"{path} : fichier introuvable"])
+        raise ConfigError([f"{path} : fichier introuvable"]) from None
     except yaml.YAMLError as exc:
-        raise ConfigError([f"{path} : YAML invalide ({exc})"])
+        raise ConfigError([f"{path} : YAML invalide ({exc})"]) from exc
     return parse_config(raw, base_dir=path.parent)

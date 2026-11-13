@@ -203,7 +203,8 @@ def test_audit_surveillance_controls(fw, ref):
     """Sans balayage ouvert : preuve de surveillance (comme avant) ; avec : écart rapporté."""
     from auspex.audit import FRAMEWORKS, _evaluate
     ctx = {"netbox": True, "rules": True, "observed": True}
-    ctl = lambda findings: next(c for c in _evaluate(FRAMEWORKS[fw], findings, ctx) if c["ref"] == ref)
+    def ctl(findings):
+        return next(c for c in _evaluate(FRAMEWORKS[fw], findings, ctx) if c["ref"] == ref)
     assert ctl([])["statut"] == "preuve"
     closed = {"id": "A", "type": "balayage_reseau", "severity": "high", "open_at_end": False,
               "opened_in_period": True, "opened_at": "2026-10-01T08:00:00+00:00",
