@@ -31,7 +31,11 @@ from ci_mfa import ENV, URL, mfa  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = Path("demo")
-SIZE = {"width": 1280, "height": 720}
+SIZE = {"width": 1280, "height": 720}     # taille de la vidéo
+# Fenêtre du navigateur plus petite que la vidéo : la page est agrandie d'environ 20 %,
+# textes et tableaux restent lisibles une fois la vidéo réduite sur un site ou un téléphone.
+VIEW = {"width": 1066, "height": 600}
+ENROLLED_PERIOD = 0
 
 # Sous-titres et curseur, réinjectés à chaque page (la vidéo ne montre pas la souris).
 INIT = """
@@ -137,7 +141,21 @@ class Film:
         self.say(caption, seconds)
 
 
-def admin_login(f: Film) -> None:
+def enroll_admin(browser) -> str:
+    """Inscription du compte admin à la double authentification, HORS caméra : la vidéo
+    publique ne montre ni QR code, ni clé, ni codes de secours (même d'un central jetable)."""
+    ctx = browser.new_context(viewport=VIEW, extra_http_headers={"X-Forwarded-For": captures.CLIENT})
+    p = ctx.new_page()
+    captures.login(p, "admin", ENV["NETBOX_ADMIN_PASSWORD"])
+    secret = captures.totp_from_page(p)
+    captures.submit_code(p, mfa.totp(secret))
+    ctx.close()
+    global ENROLLED_PERIOD
+    ENROLLED_PERIOD = int(time.time()) // 30
+    return secret
+
+
+def admin_login(f: Film, secret: str) -> None:
     p = f.page
     f.goto(f"{URL}/login/?next=/")
     f.say("Auspex se consulte dans NetBox, depuis un navigateur.", 3)
@@ -145,14 +163,13 @@ def admin_login(f: Film) -> None:
     f.type(p.locator("input[name=password]"), ENV["NETBOX_ADMIN_PASSWORD"], secret=True)
     f.click(p.locator("form button[type=submit]").last)
     p.wait_for_load_state("networkidle")
-    if "/setup/" in p.url:
-        f.say("Double authentification obligatoire : application de codes, e-mail, clé de sécurité ou carte à puce.", 5)
-        secret = captures.totp_from_page(p)
-        f.type(p.locator("#code"), mfa.totp(secret))
-        f.click(p.locator("form button[type=submit]").last)
-        p.wait_for_load_state("networkidle")
-        f.say("Dix codes de secours, montrés une seule fois.", 3.5)
-        f.quiet()
+    f.say("Double authentification obligatoire : application de codes, e-mail, clé de sécurité ou carte à puce.", 3)
+    while int(time.time()) // 30 <= ENROLLED_PERIOD:   # code d'une autre période (anti-rejeu)
+        time.sleep(0.5)
+    f.type(p.locator("#code"), mfa.totp(secret))
+    f.click(p.locator("form button[type=submit]").last)
+    p.wait_for_load_state("networkidle")
+    f.quiet()
 
 
 def run() -> None:
@@ -160,7 +177,8 @@ def run() -> None:
     captures.configure()
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
-        ctx = browser.new_context(viewport=SIZE, locale="fr-FR", record_video_dir=str(OUT / "brut"),
+        secret = enroll_admin(browser)
+        ctx = browser.new_context(viewport=VIEW, locale="fr-FR", record_video_dir=str(OUT / "brut"),
                                   record_video_size=SIZE,
                                   extra_http_headers={"X-Forwarded-For": captures.CLIENT})
         ctx.add_init_script(INIT)
@@ -168,7 +186,7 @@ def run() -> None:
         page = ctx.new_page()
         f = Film(page)
         try:
-            scenes(f, page)
+            scenes(f, page, secret)
         except Exception:
             page.screenshot(path=str(OUT / "erreur.png"))    # pour comprendre, avec la vidéo partielle
             raise
@@ -181,7 +199,7 @@ def run() -> None:
     print(f"Vidéo : {OUT / 'auspex-demo.webm'}", flush=True)
 
 
-def scenes(f: Film, page) -> None:
+def scenes(f: Film, page, secret: str) -> None:
 
     # 1. Ouverture
     f.card("Auspex", "La CMDB open source qui se remplit en écoutant le réseau", 4.5,
@@ -194,7 +212,7 @@ def scenes(f: Film, page) -> None:
                        "Le central analyse et range tout dans NetBox.", 6)
 
     # 2. Connexion
-    admin_login(f)
+    admin_login(f, secret)
 
     # 3. Tableau de bord
     f.goto(f"{URL}/")
