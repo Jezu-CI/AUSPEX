@@ -143,13 +143,13 @@ def admin_login(f: Film) -> None:
     f.say("Auspex se consulte dans NetBox, depuis un navigateur.", 3)
     f.type(p.locator("input[name=username]"), "admin")
     f.type(p.locator("input[name=password]"), ENV["NETBOX_ADMIN_PASSWORD"], secret=True)
-    f.click(p.locator("button[type=submit]"))
+    f.click(p.locator("form button[type=submit]").last)
     p.wait_for_load_state("networkidle")
     if "/setup/" in p.url:
         f.say("Double authentification obligatoire : application de codes, e-mail, clé de sécurité ou carte à puce.", 5)
         secret = captures.totp_from_page(p)
         f.type(p.locator("#code"), mfa.totp(secret))
-        f.click(p.locator("form button[type=submit]"))
+        f.click(p.locator("form button[type=submit]").last)
         p.wait_for_load_state("networkidle")
         f.say("Dix codes de secours, montrés une seule fois.", 3.5)
         f.quiet()
@@ -167,87 +167,97 @@ def run() -> None:
         ctx.add_init_script("try { localStorage.setItem('netbox-color-mode', 'light'); } catch (e) {}")
         page = ctx.new_page()
         f = Film(page)
-
-        # 1. Ouverture
-        f.card("Auspex", "La CMDB open source qui se remplit en écoutant le réseau", 4.5,
-               "<small>Inventaire des actifs IT et OT · contrôle de la segmentation · preuves NIS2, DORA, IEC 62443</small>")
-        schemas = sorted((ROOT / "site/assets/diagrammes").glob("*-clair.svg"))
-        home = next((s for s in schemas if "Capteur" in s.read_text(encoding="utf-8")
-                     and "Audit" in s.read_text(encoding="utf-8")), schemas[0] if schemas else None)
-        if home:
-            f.schema(home, "Un capteur écoute une copie du trafic, sans jamais rien émettre. "
-                           "Le central analyse et range tout dans NetBox.", 6)
-
-        # 2. Connexion
-        admin_login(f)
-
-        # 3. Tableau de bord
-        f.goto(f"{URL}/")
-        time.sleep(1.5)
-        f.say("Le tableau de bord : 7 jours de trafic d'un site IT et industriel de démonstration.", 4)
-        f.say("Écarts ouverts par gravité, état du service, inventaire observé…", 3.5)
-        f.scroll(900, 3)
-        f.say("… et la matrice des zones : en rouge, les communications qui sortent du cadre.", 4.5)
-        f.quiet()
-
-        # 4. Écarts
-        f.goto(f"{URL}/plugins/auspex/ecarts/")
-        f.say("Chaque écart compare ce qui est déclaré à ce qui est réellement observé.", 4)
-        f.type(page.locator("input[name=q]"), "3389")
-        page.locator("input[name=q]").press("Enter")
-        page.wait_for_load_state("networkidle")
-        page.mouse.move(*f.mouse)
-        f.say("Ici, un poste utilisateur ouvre un bureau à distance sur le contrôleur de domaine : "
-              "le modèle d'administration en tiers est violé. Gravité critique.", 6.5)
-        f.goto(f"{URL}/plugins/auspex/ecarts/?q=502")
-        f.say("Là, un serveur interroge directement un automate en Modbus, sans passer par la DMZ industrielle.", 5.5)
-        f.quiet()
-
-        # 5. Carte
-        f.goto(f"{URL}/plugins/auspex/carte/")
-        page.wait_for_selector("#auspex-map.ready", timeout=20000)
-        time.sleep(0.8)
-        f.say("La carte : l'informatique de gestion à gauche, l'atelier à droite, les flux en écart en rouge.", 5)
-        node = page.locator(".auspex-map-svg .node:has(.halo)").first
-        f.click(node)
-        f.say("Un clic sur un actif : son identification, ses indices, ses écarts et ses flux.", 5)
-        page.evaluate("window.auspexMap.clear()")
-        f.click(page.locator("#auspex-map-issues"))
-        f.say("« Écarts seulement » : ne garde que ce qui pose problème. Idéal en réunion.", 4.5)
-        f.quiet()
-
-        # 6. Audit NIS2
-        cfg_path = Path("config/auspex.yaml")
-        cfg = yaml.safe_load(cfg_path.read_text())
-        cfg["organisation"] = "Ville de Démo"
-        cfg_path.write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False))
-        r = subprocess.run(["docker", "compose", "exec", "-T", "auspex", "auspex", "-c", "/etc/auspex/auspex.yaml",
-                            "audit", "export", "nis2"], capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f"export d'audit : {r.stdout}{r.stderr}")
-        f.goto(f"{URL}/plugins/auspex/audits/")
-        f.say("Des rapports d'audit signés, par référentiel : NIS2, DORA, IEC 62443, ISO 27001, ANSSI.", 5)
-        archive = max(Path("data/state/tableau/audits").glob("auspex-audit-nis2-*.zip"), key=lambda p: p.stat().st_mtime)
-        with zipfile.ZipFile(archive) as z:
-            member = next(n for n in z.namelist() if n.endswith("/rapport.html"))
-            report = OUT / "rapport-nis2.html"
-            report.write_bytes(z.read(member))
-        f.goto(report.resolve().as_uri())
-        f.say("Un constat par exigence, prêt à remettre à l'auditeur…", 4)
-        f.scroll(1100, 4)
-        f.say("… et vérifiable sans Auspex : un seul fichier modifié, et la signature ne passe plus.", 5)
-        f.quiet()
-
-        # 7. Fin
-        f.card("Auspex", "Open source · licence AGPL v3 · conçu par Yann Mathon", 5,
-               "<small>Documentation, téléchargement : jezu-ci.github.io/AUSPEX</small>")
-
-        video = page.video.path()
-        ctx.close()
-        browser.close()
-    shutil.move(video, OUT / "auspex-demo.webm")
-    shutil.rmtree(OUT / "brut", ignore_errors=True)
+        try:
+            scenes(f, page)
+        except Exception:
+            page.screenshot(path=str(OUT / "erreur.png"))    # pour comprendre, avec la vidéo partielle
+            raise
+        finally:
+            video = page.video.path()
+            ctx.close()
+            browser.close()
+            shutil.move(video, OUT / "auspex-demo.webm")
+            shutil.rmtree(OUT / "brut", ignore_errors=True)
     print(f"Vidéo : {OUT / 'auspex-demo.webm'}", flush=True)
+
+
+def scenes(f: Film, page) -> None:
+
+    # 1. Ouverture
+    f.card("Auspex", "La CMDB open source qui se remplit en écoutant le réseau", 4.5,
+           "<small>Inventaire des actifs IT et OT · contrôle de la segmentation · preuves NIS2, DORA, IEC 62443</small>")
+    schemas = sorted((ROOT / "site/assets/diagrammes").glob("*-clair.svg"))
+    home = next((s for s in schemas if "Capteur" in s.read_text(encoding="utf-8")
+                 and "Audit" in s.read_text(encoding="utf-8")), schemas[0] if schemas else None)
+    if home:
+        f.schema(home, "Un capteur écoute une copie du trafic, sans jamais rien émettre. "
+                       "Le central analyse et range tout dans NetBox.", 6)
+
+    # 2. Connexion
+    admin_login(f)
+
+    # 3. Tableau de bord
+    f.goto(f"{URL}/")
+    time.sleep(1.5)
+    f.say("Le tableau de bord : 7 jours de trafic d'un site IT et industriel de démonstration.", 4)
+    f.say("Écarts ouverts par gravité, état du service, inventaire observé…", 3.5)
+    f.scroll(900, 3)
+    f.say("… et la matrice des zones : en rouge, les communications qui sortent du cadre.", 4.5)
+    f.quiet()
+
+    # 4. Écarts
+    f.goto(f"{URL}/plugins/auspex/ecarts/")
+    f.say("Chaque écart compare ce qui est déclaré à ce qui est réellement observé.", 4)
+    recherche = page.locator("#auspex-filters input[name=q]")   # pas la recherche de NetBox
+    f.type(recherche, "3389")
+    recherche.press("Enter")
+    page.wait_for_load_state("networkidle")
+    page.mouse.move(*f.mouse)
+    f.say("Ici, un poste utilisateur ouvre un bureau à distance sur le contrôleur de domaine : "
+          "le modèle d'administration en tiers est violé. Gravité critique.", 6.5)
+    f.goto(f"{URL}/plugins/auspex/ecarts/?q=502")
+    f.say("Là, un serveur interroge directement un automate en Modbus, sans passer par la DMZ industrielle.", 5.5)
+    f.quiet()
+
+    # 5. Carte
+    f.goto(f"{URL}/plugins/auspex/carte/")
+    page.wait_for_selector("#auspex-map.ready", timeout=20000)
+    time.sleep(0.8)
+    f.say("La carte : l'informatique de gestion à gauche, l'atelier à droite, les flux en écart en rouge.", 5)
+    node = page.locator(".auspex-map-svg .node:has(.halo)").first
+    f.click(node)
+    f.say("Un clic sur un actif : son identification, ses indices, ses écarts et ses flux.", 5)
+    page.evaluate("window.auspexMap.clear()")
+    f.click(page.locator("#auspex-map-issues"))
+    f.say("« Écarts seulement » : ne garde que ce qui pose problème. Idéal en réunion.", 4.5)
+    f.quiet()
+
+    # 6. Audit NIS2
+    cfg_path = Path("config/auspex.yaml")
+    cfg = yaml.safe_load(cfg_path.read_text())
+    cfg["organisation"] = "Ville de Démo"
+    cfg_path.write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False))
+    r = subprocess.run(["docker", "compose", "exec", "-T", "auspex", "auspex", "-c", "/etc/auspex/auspex.yaml",
+                        "audit", "export", "nis2"], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"export d'audit : {r.stdout}{r.stderr}")
+    f.goto(f"{URL}/plugins/auspex/audits/")
+    f.say("Des rapports d'audit signés, par référentiel : NIS2, DORA, IEC 62443, ISO 27001, ANSSI.", 5)
+    archive = max(Path("data/state/tableau/audits").glob("auspex-audit-nis2-*.zip"), key=lambda p: p.stat().st_mtime)
+    with zipfile.ZipFile(archive) as z:
+        member = next(n for n in z.namelist() if n.endswith("/rapport.html"))
+        report = OUT / "rapport-nis2.html"
+        report.write_bytes(z.read(member))
+    f.goto(report.resolve().as_uri())
+    f.say("Un constat par exigence, prêt à remettre à l'auditeur…", 4)
+    f.scroll(1100, 4)
+    f.say("… et vérifiable sans Auspex : un seul fichier modifié, et la signature ne passe plus.", 5)
+    f.quiet()
+
+    # 7. Fin
+    f.card("Auspex", "Open source · licence AGPL v3 · conçu par Yann Mathon", 5,
+           "<small>Documentation, téléchargement : jezu-ci.github.io/AUSPEX</small>")
+
 
 
 if __name__ == "__main__":

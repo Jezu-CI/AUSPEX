@@ -39,17 +39,21 @@ jobs:
         working-directory: deploy
         run: python ../tools/demo_video.py
       - name: Conversion en MP4 et image d'aperçu
+        if: always() && hashFiles('deploy/demo/auspex-demo.webm') != ''
         working-directory: deploy/demo
         run: |
           command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
           ffmpeg -loglevel error -y -i auspex-demo.webm -c:v libx264 -preset veryfast -crf 26 \
             -pix_fmt yuv420p -movflags +faststart -an auspex-demo.mp4
-          ffmpeg -loglevel error -y -ss 20 -i auspex-demo.mp4 -frames:v 1 -q:v 3 auspex-demo-apercu.jpg
+          ffmpeg -loglevel error -y -ss 20 -i auspex-demo.mp4 -frames:v 1 -q:v 3 auspex-demo-apercu.jpg || true
           ls -la
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: video-demonstration
           path: |
             deploy/demo/auspex-demo.mp4
             deploy/demo/auspex-demo-apercu.jpg
+            deploy/demo/erreur.png
+          if-no-files-found: ignore
           retention-days: 14
