@@ -186,11 +186,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
         run: |
-          cp "$BUNDLE" version/auspex-provenance.sigstore.json
+          # Nom en .intoto.jsonl : extension reconnue comme provenance (SLSA,
+          # OpenSSF Scorecard). Contenu : le paquet Sigstore de l'attestation,
+          # remis sur une seule ligne (JSON Lines).
+          jq -c . "$BUNDLE" > version/auspex-provenance.intoto.jsonl
+          [ "$(wc -l < version/auspex-provenance.intoto.jsonl)" -eq 1 ]
           tools/verifier-version.sh version
           for f in version/auspex-capteur-*.iso version/auspex-sbom.cdx.json; do
             gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" \
-              --bundle version/auspex-provenance.sigstore.json \
+              --bundle version/auspex-provenance.intoto.jsonl \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/version.yml"
           done
           # Un fichier altéré doit être refusé, une liste d'empreintes altérée aussi
@@ -201,7 +205,7 @@ jobs:
           (cd "$t" && sed -i "/auspex-sbom/d" SHA256SUMS && sha256sum auspex-sbom.cdx.json >> SHA256SUMS)
           if tools/verifier-version.sh "$t"; then echo "::error::SHA256SUMS altéré accepté"; exit 1; fi
           if gh attestation verify "$t/auspex-sbom.cdx.json" --repo "$GITHUB_REPOSITORY" \
-               --bundle version/auspex-provenance.sigstore.json; then
+               --bundle version/auspex-provenance.intoto.jsonl; then
             echo "::error::provenance acceptée pour un fichier altéré"; exit 1
           fi
           echo "Altérations refusées : fichier, liste d'empreintes, provenance"

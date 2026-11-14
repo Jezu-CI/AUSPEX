@@ -10,6 +10,10 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 - **Image NetBox du central figée par empreinte**, comme toutes les autres images : la version livrée avec Auspex ne peut plus changer à l'insu du projet ; Dependabot propose chaque nouvelle empreinte, vérifiée par la CI ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). Une autre version choisie avec `update.sh --netbox` reste possible, prise à son étiquette ; `--netbox` suivi de la version livrée y revient.
 
+### Changé
+
+- Fichier de provenance des versions renommé `auspex-provenance.intoto.jsonl` (même contenu, sur une ligne) : extension reconnue comme provenance SLSA, notamment par OpenSSF Scorecard ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). La 0.2.0 garde `auspex-provenance.sigstore.json`.
+
 ### Corrigé
 
 - Publication d'une version : publier le brouillon crée le tag, qui relançait tout le workflow (vingt minutes de construction) pour finir en échec sur une version déjà publiée. La version publiée est désormais reconnue d'emblée et le reste ignoré.
