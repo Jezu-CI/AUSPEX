@@ -23,7 +23,7 @@ class AuspexConfig(PluginConfig):
     name = "netbox_auspex"
     verbose_name = "Auspex"
     description = "CMDB passive IT/OT : restriction par IP source, double authentification"
-    version = "0.1.0"
+    version = "0.2.0"
     author = "Yann Mathon"
     base_url = "auspex"
     min_version = "4.4.0"

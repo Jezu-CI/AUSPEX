@@ -4,14 +4,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 versions selon [SemVer](https://semver.org/lang/fr/). Liens absolus : ces notes
 sont reprises telles quelles sur la page de chaque version GitHub.
 
-## [0.2.0] — en préparation
+## [0.2.0] « Lantern in the Void » — 2026-11-14
 
 ### Sécurité
 
 - **Codes de secours de la double authentification** : empreintes **scrypt** avec un sel propre à chaque code, au lieu de SHA-256 sans sel. Un vol de la base de données ne permet plus de retrouver les codes par recherche exhaustive. Les codes distribués avant la 0.2.0 restent valables jusqu'à leur utilisation.
 - **Analyse de code (linter)** : ruff vérifie à chaque modification les erreurs probables et pièges courants (règles dans `pyproject.toml`) ; corrections des points relevés (exceptions qui masquaient leur cause, fermetures sur une variable de boucle, imports inutiles).
 - **Fuzzing des analyseurs** (`fuzz/`, workflow hebdomadaire, Atheris si installé) : manifeste de mise à jour, journaux des capteurs, fichier des règles de flux, configuration. Il a révélé et fait corriger des plantages sur données abîmées ou forgées : manifeste non ASCII, en-têtes de journal Zeek incomplets, horodatages hors limites, champs du mauvais type, horodatages sans fuseau mêlés aux autres, fichier de règles hors encodage ou avec caractère nul, port « inf », configuration non UTF-8 ou de structure inattendue. Un journal envoyé par un capteur compromis ne peut plus interrompre le cycle d'analyse. Chaque cas est un test de non-régression.
-- **Fuzzing étendu à toutes les données venues de l'extérieur** (#9) : journaux compressés (gzip, archives tronquées), classeur Excel des règles, moteur d'identification (règles réelles sur des journaux forgés), clé publique d'un capteur, archive de sauvegarde à restaurer, réponses de l'API NetBox. Bornes vérifiées : 10 s par entrée (et 2 Go de mémoire avec Atheris). Corrigé : archive gzip ou classeur Excel abîmés (`zlib.error`), champs de journal du mauvais type dans l'identification (protocole numérique, état de connexion en liste, adresse MAC non textuelle), manifeste de sauvegarde illisible ou de structure inattendue, réponse NetBox illisible ou de forme inattendue (désormais vérifiée avant usage), lien de pagination NetBox mal formé ou **sans fin** (le cycle pouvait boucler indéfiniment). Mémoire bornée : une ligne de journal de plus de 1 Mo est ignorée sans être lue entière (une archive piégée de 200 Ko faisait monter la mémoire à plus de 400 Mo, 19 Mo désormais) ; un fichier de règles est limité à 20 000 lignes.
+- **Fuzzing étendu à toutes les données venues de l'extérieur** ([#9](https://github.com/Jezu-CI/AUSPEX/issues/9)) : journaux compressés (gzip, archives tronquées), classeur Excel des règles, moteur d'identification (règles réelles sur des journaux forgés), clé publique d'un capteur, archive de sauvegarde à restaurer, réponses de l'API NetBox. Bornes vérifiées : 10 s par entrée (et 2 Go de mémoire avec Atheris). Corrigé : archive gzip ou classeur Excel abîmés (`zlib.error`), champs de journal du mauvais type dans l'identification (protocole numérique, état de connexion en liste, adresse MAC non textuelle), manifeste de sauvegarde illisible ou de structure inattendue, réponse NetBox illisible ou de forme inattendue (désormais vérifiée avant usage), lien de pagination NetBox mal formé ou **sans fin** (le cycle pouvait boucler indéfiniment). Mémoire bornée : une ligne de journal de plus de 1 Mo est ignorée sans être lue entière (une archive piégée de 200 Ko faisait monter la mémoire à plus de 400 Mo, 19 Mo désormais) ; un fichier de règles est limité à 20 000 lignes.
 
 ### Changé
 
@@ -24,6 +24,7 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 - Documentation publique recentrée sur l'utilisation : authentification,
   capteurs, exports d'audit, exploitation, configuration (sorties SIEM
   comprises), preuves automatisées ; limites connues dans SECURITY.md.
+- Modèle de module (`templates/module-rules`) déclaré compatible avec Auspex 0.2 (`>=0.2,<0.3`) : un module écrit pour la 0.1 doit élargir sa plage `auspex:` après vérification.
 
 ### Ajouté
 
@@ -33,7 +34,14 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 - **Miroir des empreintes hors GitHub** ([#5](https://github.com/Jezu-CI/AUSPEX/issues/5)) : à la publication de chaque version, `SHA256SUMS` et sa signature, vérifiés au préalable, sont copiés dans [codeberg.org/Jezu_CI/AUSPEX-empreintes](https://codeberg.org/Jezu_CI/AUSPEX-empreintes) (un dossier par version, jamais modifié ensuite), puis relus et comparés. `tools/verifier-version.sh DOSSIER vX.Y.Z` compare en plus avec ce miroir, pour recouper si le compte GitHub du projet était compromis.
 - **Référencement du site** (moteurs de recherche et moteurs de réponse IA) : description précise et titre explicite pour chaque page, aperçus de partage (Open Graph, cartes sociales) avec l'image du projet, données structurées schema.org (logiciel, auteur, site, questions fréquentes), page **Questions fréquentes**, page **À propos**, résumé **en anglais** (liens hreflang), fichier `llms.txt` pour les assistants IA, images chargées à la demande.
 - **Site respectueux de la vie privée** : aucun cookie, aucune mesure d'audience, aucune ressource tierce (polices du système au lieu de Google Fonts, schémas pré-rendus en images au lieu d'un script externe, plus d'appel à l'API GitHub depuis le navigateur) ; la publication du site échoue si une page charge une ressource depuis un autre domaine. Pages **Mentions légales** et **Confidentialité**, liées en pied de page.
+- **Vidéo de démonstration** de deux minutes sur l'accueil du site, filmée automatiquement par la CI sur un vrai central (workflow à la demande), hébergée sur le site sans service tiers.
 - **Guide utilisateur** (13 pages en langage simple) intégré au site, et **choix du public** dès l'accueil : « utiliser Auspex » ou « la technique » ; les pages techniques renvoient vers le guide utilisateur.
+
+
+### Limites connues
+
+- Règles toujours étalonnées sur des captures publiques : captures de terrain
+  reportées en v0.3 ([#3](https://github.com/Jezu-CI/AUSPEX/issues/3)).
 
 
 ## [0.1.0] « Silence Before Dawn » — 2026-11-02

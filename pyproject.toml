@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auspex"
-version = "0.1.0"
+version = "0.2.0"
 description = "CMDB open source passive IT/OT : inventaire sans agent, conformité de segmentation, alertes SIEM"
 readme = "README.md"
 license = { text = "AGPL-3.0-only" }

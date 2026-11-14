@@ -5,7 +5,7 @@ Un module est un dépôt Git contenant un manifeste `module.yaml` :
     name: auspex-rules-schneider
     version: 0.4.1
     type: rules                  # rules | references
-    auspex: ">=0.1,<0.2"         # versions d'Auspex compatibles
+    auspex: ">=0.2,<0.3"         # versions d'Auspex compatibles
     license: Apache-2.0
     description: Identification des automates Schneider Electric
 

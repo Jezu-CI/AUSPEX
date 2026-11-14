@@ -8,7 +8,7 @@
 [![Licence AGPL v3](https://img.shields.io/badge/licence-AGPL%20v3-blue)](LICENSE)
 [![Site](https://img.shields.io/badge/site-jezu--ci.github.io%2FAUSPEX-12805a)](https://jezu-ci.github.io/AUSPEX/)
 
-*CMDB open source passive IT/OT — v0.1 « Silence Before Dawn »*
+*CMDB open source passive IT/OT — v0.2 « Lantern in the Void »*
 
 **Site du projet : [jezu-ci.github.io/AUSPEX](https://jezu-ci.github.io/AUSPEX/)** — documentation, captures d'écran, téléchargement.
 
@@ -27,7 +27,7 @@ sur les réseaux surveillés. Conçu pour les environnements IT et industriels
 
 *Aucun flux non déclaré n'échappe au regard de l'Auspex. Pour l'Empereur.*
 
-> **État du projet : v0.1, déployable.** Central complet (NetBox + Auspex en
+> **État du projet : v0.2, déployable, versions signées.** Central complet (NetBox + Auspex en
 > docker compose), capteur Docker et appliance ISO, identification IT/OT,
 > conformité des flux, alertes SIEM, tableau de bord et carte, exports d'audit
 > signés, authentification forte (MFA, clé de sécurité, carte à puce, LDAPS,
@@ -820,7 +820,8 @@ docs/              documentation (exploitation, configuration, preuves)
 | J7 | plugin NetBox : trusted hosts, MFA, LDAPS / OIDC / SAML, tableau de bord, carte interactive | **fait** |
 | J8 | exports d'audit signés par référentiel (NIS2, DORA, IEC 62443, ISO 27001, ANSSI) | **fait** |
 | J9 | ISO durcie du capteur, envoi des logs au central, WebAuthn, carte à puce, mises à jour signées | **fait** |
-| v0.2 | signature des versions (Sigstore), alertes SIEM sur les balayages, captures de terrain, OpenSSF Scorecard, miroir des empreintes | [en cours](https://github.com/Jezu-CI/AUSPEX/milestone/1) |
+| v0.2 | versions signées (Sigstore, provenance SLSA), alerte SIEM sur les balayages, miroir des empreintes hors GitHub, OpenSSF Scorecard, fuzzing des données externes | **fait** |
+| v0.3 | captures de terrain, Scorecard (critères liés à l'ancienneté du projet) | [à venir](https://github.com/Jezu-CI/AUSPEX/milestone/2) |
 
 ## Noms de version
 
@@ -829,6 +830,7 @@ Chaque version porte un nom de code :
 | Version | Nom de code |
 | --- | --- |
 | 0.1 | Silence Before Dawn |
+| 0.2 | Lantern in the Void |
 
 ## Licence
 
