@@ -208,6 +208,9 @@ def test_dependabot_watches_lock_files():
     cfg = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))
     pip = next(u for u in cfg["updates"] if u["package-ecosystem"] == "pip")
     assert "/requirements" in pip["directories"]
+    # Versions exactes des fichiers figés seulement : pas de relèvement des bornes
+    # minimales de pyproject.toml à chaque version publiée
+    assert pip["versioning-strategy"] == "lockfile-only"
 
 
 def test_project_installs_never_download_build_tools():
