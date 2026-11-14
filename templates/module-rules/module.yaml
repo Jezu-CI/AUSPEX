@@ -2,6 +2,6 @@
 name: auspex-rules-exemple          # minuscules, chiffres et tirets
 version: 0.1.0                      # doit correspondre au tag Git (v0.1.0)
 type: rules                         # rules (identification) ou references (référentiels)
-auspex: ">=0.1,<0.2"                # versions d'Auspex compatibles
+auspex: ">=0.2,<0.3"                # versions d'Auspex compatibles
 license: Apache-2.0
 description: Exemple de module de règles d'identification

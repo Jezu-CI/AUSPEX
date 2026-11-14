@@ -8,7 +8,7 @@ observations (logs Zeek au format JSON) et une configuration déclarative, et
 produit des identifications d'actifs, des écarts de conformité et des alertes.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Chaque version porte un nom de code, dans l'esprit des noms de vaisseaux.
-__codename__ = "Silence Before Dawn"
+__codename__ = "Lantern in the Void"

@@ -12,7 +12,7 @@ body:
     id: version
     attributes:
       label: Version d'Auspex
-      placeholder: "0.1.0 (fichier VERSION ou pied de page NetBox)"
+      placeholder: "0.2.0 (fichier VERSION ou pied de page NetBox)"
     validations:
       required: true
   - type: dropdown

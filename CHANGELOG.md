@@ -4,7 +4,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 versions selon [SemVer](https://semver.org/lang/fr/). Liens absolus : ces notes
 sont reprises telles quelles sur la page de chaque version GitHub.
 
-## [0.2.0] — en préparation
+## [0.2.0] « Lantern in the Void » — 2026-11-14
 
 ### Sécurité
 
@@ -24,6 +24,7 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 - Documentation publique recentrée sur l'utilisation : authentification,
   capteurs, exports d'audit, exploitation, configuration (sorties SIEM
   comprises), preuves automatisées ; limites connues dans SECURITY.md.
+- Modèle de module (`templates/module-rules`) déclaré compatible avec Auspex 0.2 (`>=0.2,<0.3`) : un module écrit pour la 0.1 doit élargir sa plage `auspex:` après vérification.
 
 ### Ajouté
 
@@ -33,6 +34,7 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 - **Miroir des empreintes hors GitHub** ([#5](https://github.com/Jezu-CI/AUSPEX/issues/5)) : à la publication de chaque version, `SHA256SUMS` et sa signature, vérifiés au préalable, sont copiés dans [codeberg.org/Jezu_CI/AUSPEX-empreintes](https://codeberg.org/Jezu_CI/AUSPEX-empreintes) (un dossier par version, jamais modifié ensuite), puis relus et comparés. `tools/verifier-version.sh DOSSIER vX.Y.Z` compare en plus avec ce miroir, pour recouper si le compte GitHub du projet était compromis.
 - **Référencement du site** (moteurs de recherche et moteurs de réponse IA) : description précise et titre explicite pour chaque page, aperçus de partage (Open Graph, cartes sociales) avec l'image du projet, données structurées schema.org (logiciel, auteur, site, questions fréquentes), page **Questions fréquentes**, page **À propos**, résumé **en anglais** (liens hreflang), fichier `llms.txt` pour les assistants IA, images chargées à la demande.
 - **Site respectueux de la vie privée** : aucun cookie, aucune mesure d'audience, aucune ressource tierce (polices du système au lieu de Google Fonts, schémas pré-rendus en images au lieu d'un script externe, plus d'appel à l'API GitHub depuis le navigateur) ; la publication du site échoue si une page charge une ressource depuis un autre domaine. Pages **Mentions légales** et **Confidentialité**, liées en pied de page.
+- **Vidéo de démonstration** de deux minutes sur l'accueil du site, filmée automatiquement par la CI sur un vrai central (workflow à la demande), hébergée sur le site sans service tiers.
 - **Guide utilisateur** (13 pages en langage simple) intégré au site, et **choix du public** dès l'accueil : « utiliser Auspex » ou « la technique » ; les pages techniques renvoient vers le guide utilisateur.
 
 
