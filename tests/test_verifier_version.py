@@ -244,3 +244,15 @@ def test_already_published_step(tmp_path, event, reponse, code, publiee, ok):
     assert (r.returncode == 0) is ok, r.stdout + r.stderr
     if ok:
         assert out.read_text() == f"publiee={publiee}\n"
+
+
+def test_provenance_named_for_slsa_tools():
+    """La provenance est publiée sous un nom en .intoto.jsonl (reconnu par OpenSSF
+    Scorecard et les outils SLSA), sur une seule ligne, et c'est ce fichier-là
+    que la publication vérifie et joint à la version."""
+    wf = yaml.safe_load(WF.read_text(encoding="utf-8"))
+    run = next(s["run"] for s in wf["jobs"]["signer"]["steps"] if s.get("name") == "Vérification, comme un utilisateur")
+    assert 'jq -c . "$BUNDLE" > version/auspex-provenance.intoto.jsonl' in run
+    assert run.count("--bundle version/auspex-provenance.intoto.jsonl") == 2
+    assert "auspex-provenance.sigstore.json" not in WF.read_text(encoding="utf-8")
+    assert "auspex-provenance.intoto.jsonl" in (ROOT / "site" / "telecharger.md").read_text(encoding="utf-8")

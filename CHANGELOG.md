@@ -6,6 +6,10 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 ## [0.3.0] — en préparation
 
+### Changé
+
+- Fichier de provenance des versions renommé `auspex-provenance.intoto.jsonl` (même contenu, sur une ligne) : extension reconnue comme provenance SLSA, notamment par OpenSSF Scorecard ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). La 0.2.0 garde `auspex-provenance.sigstore.json`.
+
 ### Corrigé
 
 - Publication d'une version : publier le brouillon crée le tag, qui relançait tout le workflow (vingt minutes de construction) pour finir en échec sur une version déjà publiée. La version publiée est désormais reconnue d'emblée et le reste ignoré.
