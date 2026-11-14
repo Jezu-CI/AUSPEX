@@ -4,6 +4,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 versions selon [SemVer](https://semver.org/lang/fr/). Liens absolus : ces notes
 sont reprises telles quelles sur la page de chaque version GitHub.
 
+## [0.3.0] — en préparation
+
+### Corrigé
+
+- Publication d'une version : publier le brouillon crée le tag, qui relançait tout le workflow (vingt minutes de construction) pour finir en échec sur une version déjà publiée. La version publiée est désormais reconnue d'emblée et le reste ignoré.
+
 ## [0.2.0] « Lantern in the Void » — 2026-11-14
 
 ### Sécurité
