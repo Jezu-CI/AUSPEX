@@ -20,6 +20,7 @@ import json
 import shutil
 import tarfile
 import tempfile
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
@@ -91,25 +92,43 @@ def _safe_member(m: tarfile.TarInfo) -> None:
         raise BackupError(f"archive refusée : entrée inattendue « {m.name} »")
 
 
+def _check_manifest(manifest) -> None:
+    if not isinstance(manifest, dict):
+        raise BackupError("archive refusée : manifeste illisible")
+    if manifest.get("format") != FORMAT:
+        raise BackupError(f"format d'archive {str(manifest.get('format'))[:20]} non pris en charge")
+    files = manifest.get("files")
+    if not isinstance(files, dict) or not all(
+            isinstance(meta, dict) and isinstance(meta.get("sha256"), str) for meta in files.values()):
+        raise BackupError("archive refusée : liste des fichiers du manifeste illisible")
+
+
 def inspect_backup(archive: Path) -> dict:
-    """Vérifie l'archive sans rien écrire ; renvoie son manifeste."""
-    with tarfile.open(archive, "r:gz") as tar:
-        members = tar.getmembers()
-        for m in members:
-            _safe_member(m)
-        mf = tar.extractfile("manifest.json")
-        if mf is None:
-            raise BackupError("archive refusée : manifest.json absent")
-        manifest = json.loads(mf.read())
-        if manifest.get("format") != FORMAT:
-            raise BackupError(f"format d'archive {manifest.get('format')} non pris en charge")
-        files = {m.name: m for m in members if m.isfile() and m.name != "manifest.json"}
-        if set(files) != set(manifest["files"]):
-            raise BackupError("archive refusée : contenu différent du manifeste")
-        for name, meta in manifest["files"].items():
-            data = tar.extractfile(files[name]).read()
-            if hashlib.sha256(data).hexdigest() != meta["sha256"]:
-                raise BackupError(f"archive refusée : empreinte invalide pour « {name} »")
+    """Vérifie l'archive sans rien écrire ; renvoie son manifeste.
+
+    Toute archive abîmée, tronquée ou forgée est refusée par une BackupError."""
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            members = tar.getmembers()
+            for m in members:
+                _safe_member(m)
+            try:
+                mf = tar.extractfile("manifest.json")
+            except KeyError:
+                mf = None
+            if mf is None:
+                raise BackupError("archive refusée : manifest.json absent")
+            manifest = json.loads(mf.read())
+            _check_manifest(manifest)
+            files = {m.name: m for m in members if m.isfile() and m.name != "manifest.json"}
+            if set(files) != set(manifest["files"]):
+                raise BackupError("archive refusée : contenu différent du manifeste")
+            for name, meta in manifest["files"].items():
+                data = tar.extractfile(files[name]).read()
+                if hashlib.sha256(data).hexdigest() != meta["sha256"]:
+                    raise BackupError(f"archive refusée : empreinte invalide pour « {name} »")
+    except (tarfile.TarError, EOFError, OSError, zlib.error, ValueError, RecursionError) as exc:
+        raise BackupError(f"archive illisible ou abîmée : {str(exc)[:200]}") from exc
     return manifest
 
 

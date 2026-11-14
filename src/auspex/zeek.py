@@ -11,6 +11,7 @@ import gzip
 import hashlib
 import json
 import re
+import zlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,11 @@ TCP_ESTABLISHED = {"SF", "S1", "S2", "S3", "RSTO", "RSTR"}
 # asymétriques (relevé sur captures réelles : un automate y passait pour un
 # scanner) ; ils ne comptent pas pour la détection des balayages.
 TCP_UNANSWERED = {"REJ", "S0"}
+
+
+# Longueur maximale d'une ligne de journal : les plus longues de Zeek (certificats,
+# en-têtes HTTP) font quelques dizaines de Ko. Au-delà, la ligne est ignorée.
+MAX_LINE = 1 << 20
 
 
 def _open_bin(path: Path):
@@ -44,12 +50,25 @@ def _complete_lines(path: Path) -> Iterator[tuple[int, bytes]]:
     pos = 0
     with _open_bin(path) as fh:
         try:
-            for raw in fh:
+            while True:
+                raw = fh.readline(MAX_LINE)
+                if not raw:
+                    return
+                if len(raw) == MAX_LINE and not raw.endswith(b"\n"):
+                    # Ligne démesurée (journal abîmé ou forgé, archive piégée) : ignorée sans
+                    # jamais être gardée entière en mémoire, jusqu'au retour à la ligne suivant.
+                    pos += len(raw)
+                    while raw and not raw.endswith(b"\n"):
+                        raw = fh.readline(MAX_LINE)
+                        pos += len(raw)
+                    if not raw:
+                        return
+                    continue
                 if not raw.endswith(b"\n"):
                     return
                 yield pos, raw
                 pos += len(raw)
-        except (EOFError, OSError):
+        except (EOFError, OSError, zlib.error):   # archive tronquée ou abîmée
             return
 
 

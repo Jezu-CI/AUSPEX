@@ -84,6 +84,65 @@ class NetBoxError(Exception):
     pass
 
 
+# Pages de 1000 objets : un million d'objets au plus par liste.
+MAX_PAGES = 1000
+
+
+def decode_response(raw: bytes, method: str, path: str):
+    """Corps JSON d'une réponse de NetBox ; NetBoxError s'il est illisible."""
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (ValueError, RecursionError) as exc:
+        raise NetBoxError(f"{method} {path} : réponse illisible (JSON attendu)") from exc
+
+
+def _is_id(v) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _objet_ref(v, cle: str) -> bool:
+    """None, ou un objet {cle: …} du bon type (référence imbriquée de NetBox)."""
+    if v is None:
+        return True
+    if not isinstance(v, dict):
+        return False
+    return _is_id(v.get(cle)) if cle == "id" else isinstance(v.get(cle), (str, type(None)))
+
+
+def check_objects(ip_objects: list[dict], declared: list[dict]) -> None:
+    """Vérifie la forme des objets NetBox lus avant de les exploiter.
+
+    Seuls les champs utilisés par le rapprochement sont contrôlés. Une réponse
+    inattendue (version de NetBox incompatible, proxy, serveur défaillant) donne
+    une NetBoxError claire au lieu d'interrompre le cycle sur une exception.
+    """
+    for o in ip_objects:
+        ao = o.get("assigned_object")
+        ok = (_is_id(o.get("id")) and isinstance(o.get("address"), str)
+              and isinstance(o.get("assigned_object_type"), (str, type(None)))
+              and isinstance(o.get("custom_fields"), (dict, type(None)))
+              and isinstance(o.get("tags", []), list)
+              and all(isinstance(t, dict) and isinstance(t.get("slug"), str) for t in o.get("tags", []))
+              and (ao is None or (isinstance(ao, dict)
+                                  and _objet_ref(ao.get("device"), "id")
+                                  and _objet_ref(ao.get("virtual_machine"), "id"))))
+        if not ok:
+            raise NetBoxError(f"adresse IP NetBox de forme inattendue : {str(o)[:200]}")
+    for d in declared:
+        status = d.get("status")
+        ok = (_is_id(d.get("id")) and isinstance(d.get("name"), (str, type(None)))
+              and (status is None or isinstance(status, str)
+                   or (isinstance(status, dict) and isinstance(status.get("value"), (str, type(None)))))
+              and _objet_ref(d.get("platform"), "name")
+              and isinstance(d.get("custom_fields"), (dict, type(None)))
+              and all(d.get(k) is None or (isinstance(d[k], dict) and isinstance(d[k].get("address"), str))
+                      for k in ("primary_ip4", "primary_ip6", "primary_ip")))
+        if not ok:
+            raise NetBoxError(f"équipement NetBox de forme inattendue : {str(d)[:200]}")
+
+
 class NetBoxClient:
     def __init__(self, url: str, token: str, ca_file: str | None = None, timeout: int = 30):
         self.url = url.rstrip("/")
@@ -110,29 +169,47 @@ class NetBoxClient:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout, context=self.ctx) as resp:
                 raw = resp.read()
-                return json.loads(raw) if raw else None
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")[:500]
             raise NetBoxError(f"{method} {path} : HTTP {exc.code} — {detail}") from exc
         except urllib.error.URLError as exc:
             raise NetBoxError(f"{method} {path} : {exc.reason}") from exc
+        return decode_response(raw, method, path)
 
     def list(self, path: str, params: dict | None = None) -> list[dict]:
         out: list[dict] = []
         page = self.request("GET", path, {"limit": 1000, **(params or {})})
+        vues: set[str] = set()
         while True:
+            if not isinstance(page, dict) or not isinstance(page.get("results"), list) \
+                    or not all(isinstance(o, dict) for o in page["results"]):
+                raise NetBoxError(f"GET {path} : réponse inattendue (liste de résultats attendue)")
             out.extend(page["results"])
             nxt = page.get("next")
             if not nxt:
                 return out
+            if not isinstance(nxt, str):
+                raise NetBoxError(f"GET {path} : lien vers la page suivante invalide")
             # Le lien « next » doit pointer vers le même serveur.
-            if urlparse(nxt).netloc != urlparse(self.url).netloc:
-                nxt = self.url + urlparse(nxt).path + "?" + urlparse(nxt).query
+            try:
+                lien = urlparse(nxt)
+                if lien.netloc != urlparse(self.url).netloc:
+                    nxt = self.url + lien.path + "?" + lien.query
+            except ValueError as exc:
+                raise NetBoxError(f"GET {path} : lien vers la page suivante invalide") from exc
+            # Une page déjà lue ou une pagination sans fin ne bloquent pas le cycle.
+            if nxt in vues or len(vues) >= MAX_PAGES:
+                raise NetBoxError(f"GET {path} : pagination sans fin (page suivante déjà lue ou "
+                                  f"plus de {MAX_PAGES} pages)")
+            vues.add(nxt)
             page = self.request("GET", nxt)
 
     def version(self) -> tuple[int, int]:
         if self._version is None:
-            v = str(self.request("GET", "/api/status/").get("netbox-version", "0.0"))
+            status = self.request("GET", "/api/status/")
+            if not isinstance(status, dict):
+                raise NetBoxError("GET /api/status/ : réponse inattendue")
+            v = str(status.get("netbox-version", "0.0"))
             parts = [int("".join(c for c in x if c.isdigit()) or 0) for x in v.split(".")[:2]]
             self._version = (parts[0], parts[1] if len(parts) > 1 else 0)
         return self._version

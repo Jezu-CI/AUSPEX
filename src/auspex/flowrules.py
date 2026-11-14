@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import zipfile
+import zlib
 import hashlib
 import ipaddress
 import json
@@ -32,6 +33,11 @@ HEADER_ALIASES = {
     "owner": "proprietaire", "responsable": "proprietaire", "expiration": "expire_le",
     "expire": "expire_le", "date_expiration": "expire_le", "expires": "expire_le",
 }
+
+
+# Lignes au plus dans un fichier de règles (un site en compte quelques centaines) :
+# temps et mémoire de l'import restent bornés, quel que soit le fichier déposé.
+MAX_ROWS = 20000
 
 
 def _norm_header(h: object) -> str:
@@ -213,6 +219,8 @@ def _rows_from_csv(path: Path, meta: dict) -> Iterable[tuple[int, dict]]:
     reader = csv.reader(text.splitlines(), dialect)
     header = None
     for lineno, row in enumerate(reader, start=1):
+        if lineno > MAX_ROWS:
+            raise csv.Error(f"plus de {MAX_ROWS} lignes : découper le fichier")
         if not any(c.strip() for c in row):
             continue
         if header is None:
@@ -228,6 +236,8 @@ def _rows_from_xlsx(path: Path, meta: dict) -> Iterable[tuple[int, dict]]:
     ws = wb["regles"] if "regles" in wb.sheetnames else wb.worksheets[0]
     header = None
     for lineno, row in enumerate(ws.iter_rows(values_only=True), start=1):
+        if lineno > MAX_ROWS:
+            raise ValueError(f"plus de {MAX_ROWS} lignes : découper le fichier")
         if row is None or not any(c not in (None, "") for c in row):
             continue
         if header is None:
@@ -245,7 +255,13 @@ def import_rules(path: str | Path, zone_names: Iterable[str]) -> ImportResult:
     zone_names = set(zone_names)
     meta: dict = {}
     if path.suffix.lower() == ".xlsx":
-        rows = _rows_from_xlsx(path, meta)
+        # Le classeur est lu en entier d'abord : un fichier abîmé ou forgé peut lever
+        # n'importe quelle exception dans openpyxl (zip, XML, styles…) et doit donner
+        # un problème d'import ; la validation des lignes, elle, reste hors de ce filet.
+        try:
+            rows = list(_rows_from_xlsx(path, meta))
+        except Exception as exc:  # noqa: BLE001
+            return ImportResult([], [ImportProblem(0, "", f"fichier Excel refusé : {str(exc)[:200]}")])
     elif path.suffix.lower() == ".csv":
         rows = _rows_from_csv(path, meta)
     else:
@@ -254,7 +270,7 @@ def import_rules(path: str | Path, zone_names: Iterable[str]) -> ImportResult:
         return _validate_rows(rows, zone_names, meta)
     except csv.Error as exc:            # CSV illisible (caractère nul, champ démesuré…)
         return ImportResult([], [ImportProblem(0, "", f"fichier CSV illisible : {exc}")])
-    except (zipfile.BadZipFile, KeyError, ValueError, OSError) as exc:   # classeur Excel abîmé
+    except (zipfile.BadZipFile, zlib.error, KeyError, ValueError, OSError) as exc:   # classeur Excel abîmé
         return ImportResult([], [ImportProblem(0, "", f"fichier illisible : {exc}")])
 
 

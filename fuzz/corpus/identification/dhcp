@@ -1,0 +1,1 @@
+{"ts": 1793500000.0, "uid": "C1", "id.orig_h": "172.16.2.20", "id.orig_p": 50000, "id.resp_h": "172.16.2.10", "id.resp_p": 502, "proto": "tcp", "server_addr": "10.0.0.1", "assigned_addr": "10.2.1.13", "mac": "00:1b:1b:aa:bb:cc", "host_name": "PANELPC02"}

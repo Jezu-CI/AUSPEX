@@ -1,7 +1,9 @@
 # Fuzzing des analyseurs qui lisent des données venues de l'extérieur (fuzz/cibles.py) :
-# manifeste de mise à jour, journaux des capteurs, fichier des règles de flux, champs
-# de règle, configuration. Chaque semaine et à la demande. Un plantage fait échouer
-# le workflow ; l'entrée fautive est jointe en artefact.
+# manifeste de mise à jour, journaux des capteurs (bruts ou compressés), règles de flux
+# (CSV, Excel, champs), configuration, moteur d'identification, clé publique d'un capteur,
+# archive de sauvegarde, réponses de NetBox. Chaque semaine et à la demande. Un plantage
+# ou une entrée trop lente (fuzz/fuzz.py : LENTEUR) fait échouer le workflow ; l'entrée
+# fautive est jointe en artefact.
 name: Fuzzing
 
 on:
@@ -23,7 +25,7 @@ concurrency:
 jobs:
   fuzz:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
