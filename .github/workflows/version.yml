@@ -16,6 +16,9 @@ name: Publication d'une version
 # Deux façons de lancer :
 # - Actions → « Publication d'une version » → Run workflow (publier = oui) ;
 # - pousser un tag vX.Y.Z.
+# Publier le brouillon crée le tag, qui relance ce workflow : le premier job
+# constate que la version est déjà publiée et tout le reste est ignoré (ni
+# reconstruction, ni échec).
 on:
   push:
     tags: ["v*.*.*"]
@@ -30,8 +33,42 @@ permissions:
   contents: read
 
 jobs:
+  deja:
+    name: Version déjà publiée ?
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    outputs:
+      publiee: ${{ steps.r.outputs.publiee }}
+    steps:
+      - name: Recherche de la version publiée
+        id: r
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Seul un tag poussé peut correspondre à une version déjà publiée. Un
+          # brouillon n'est pas visible ici (lecture seule) : le job « signer »
+          # le refuse comme avant.
+          publiee=false
+          if [ "$EVENT" = push ]; then
+            if out=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.draft' 2>&1); then
+              if [ "$out" = false ]; then
+                publiee=true
+                echo "::notice::la version $TAG est déjà publiée : rien à reconstruire"
+              fi
+            elif ! printf '%s' "$out" | grep -q 'HTTP 404'; then
+              echo "::error::impossible de vérifier si $TAG est publiée : $out"; exit 1
+            fi
+          fi
+          echo "publiee=$publiee" >> "$GITHUB_OUTPUT"
+
   construire:
     name: Construire et tester (sans droits)
+    needs: deja
+    if: needs.deja.outputs.publiee != 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read

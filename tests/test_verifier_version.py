@@ -213,3 +213,34 @@ def test_version_check_step(tmp_path, event, publier, entete, ok):
     assert (r.returncode == 0) is ok, r.stdout + r.stderr
     if ok:
         assert f"publier={'true' if publier == 'true' or event == 'push' else 'false'}" in out.read_text()
+
+
+@pytest.mark.parametrize("event, reponse, code, publiee, ok", [
+    ("push", "false", 0, "true", True),              # tag créé en publiant le brouillon : tout est ignoré
+    ("push", "gh: Not Found (HTTP 404)", 1, "false", True),   # tag poussé sans version : on construit
+    ("push", "true", 0, "false", True),              # brouillon visible : contrôle laissé à « signer »
+    ("push", "gh: Server Error (HTTP 502)", 1, "", False),    # doute : échec franc, pas de construction
+    ("workflow_dispatch", "", 0, "false", True),     # lancement à la main : pas de recherche
+])
+def test_already_published_step(tmp_path, event, reponse, code, publiee, ok):
+    """Publier le brouillon crée le tag, qui relance le workflow : la version déjà
+    publiée est reconnue d'emblée et la construction ignorée, au lieu d'échouer
+    après vingt minutes. L'étape s'exécute telle quelle, avec un faux « gh »."""
+    wf = yaml.safe_load(WF.read_text(encoding="utf-8"))
+    deja = wf["jobs"]["deja"]
+    assert deja["permissions"] == {"contents": "read"}
+    assert wf["jobs"]["construire"]["needs"] == "deja"
+    assert wf["jobs"]["construire"]["if"] == "needs.deja.outputs.publiee != 'true'"
+    assert wf["jobs"]["signer"]["needs"] == "construire"
+    run = next(s["run"] for s in deja["steps"] if s.get("id") == "r")
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (fake / "gh").write_text(f"#!/bin/sh\nprintf '%s\\n' '{reponse}'\nexit {code}\n")
+    (fake / "gh").chmod(0o755)
+    out = tmp_path / "out"
+    r = subprocess.run(["bash", "-e", "-c", run], capture_output=True, text=True,
+                       env={**os.environ, "PATH": f"{fake}:{os.environ['PATH']}", "EVENT": event,
+                            "TAG": "v9.9.9", "GITHUB_REPOSITORY": "Jezu-CI/AUSPEX", "GITHUB_OUTPUT": str(out)})
+    assert (r.returncode == 0) is ok, r.stdout + r.stderr
+    if ok:
+        assert out.read_text() == f"publiee={publiee}\n"
