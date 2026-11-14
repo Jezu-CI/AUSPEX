@@ -387,7 +387,7 @@ def cmd_netbox_setup(args) -> int:
 
 def run_netbox_sync(cfg: Config, now_arg: str | None = None, apply: bool = False, send: bool = True) -> dict:
     """Rapproche l'inventaire observé de NetBox ; écrit et alerte si `apply`."""
-    from .netbox import apply_plan, build_plan, fetch_declared, reconcile, setup_plan
+    from .netbox import apply_plan, build_plan, check_objects, fetch_declared, reconcile, setup_plan
     client = _netbox_client(cfg)
     if setup_plan(client):
         raise NetBoxError("NetBox n'est pas prêt : lancer d'abord « auspex apply »")
@@ -398,6 +398,7 @@ def run_netbox_sync(cfg: Config, now_arg: str | None = None, apply: bool = False
 
     ip_objects = client.list("/api/ipam/ip-addresses/")
     declared = fetch_declared(client)
+    check_objects(ip_objects, declared)
     plan = build_plan(cfg, assets, ip_objects)
     findings = reconcile(cfg, assets, ip_objects, declared, now)
     _add_references(findings, _extra_references(cfg))

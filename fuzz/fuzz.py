@@ -6,8 +6,9 @@
 
 Avec Atheris installé (pip install atheris, Python 3.11) : fuzzing guidé par la
 couverture de code. Sans Atheris : mutations aléatoires du corpus (moins efficace,
-mais utilisable partout). Un plantage affiche l'entrée fautive et l'enregistre
-dans fuzz/plantages/.
+mais utilisable partout). Une entrée qui dépasse LENTEUR secondes (et MEMOIRE_MO Mo
+de mémoire, avec Atheris) compte comme un plantage. Un plantage affiche l'entrée
+fautive et l'enregistre dans fuzz/plantages/.
 """
 from __future__ import annotations
 
@@ -22,6 +23,9 @@ sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "src"), str(Path(__
 import cibles  # noqa: E402
 
 ICI = Path(__file__).resolve().parent
+# Bornes d'une entrée : au-delà, c'est un défaut (boucle, explosion de calcul ou de mémoire).
+LENTEUR = 10            # secondes
+MEMOIRE_MO = 2048
 
 
 def corpus(cible: str) -> list[bytes]:
@@ -66,8 +70,12 @@ def sans_atheris(nom: str, secondes: float, graine: int = 0) -> int:
     while time.monotonic() < fin:
         data = muter(rng, rng.choice(graines), graines) if rng.random() < 0.9 else rng.randbytes(rng.randrange(256))
         n += 1
+        debut = time.monotonic()
         try:
             f(data)
+            duree = time.monotonic() - debut
+            if duree > LENTEUR:
+                raise TimeoutError(f"entrée traitée en {duree:.1f} s (borne : {LENTEUR} s)")
         except Exception:
             dossier = ICI / "plantages"
             dossier.mkdir(exist_ok=True)
@@ -84,7 +92,8 @@ def avec_atheris(nom: str, secondes: float) -> int:
     import atheris  # fuzzing guidé par la couverture (détecté par OpenSSF Scorecard)
     f = cibles.CIBLES[nom]
     dossier = ICI / "corpus" / nom
-    atheris.Setup([sys.argv[0], f"-max_total_time={int(secondes)}", "-rss_limit_mb=2048",
+    atheris.Setup([sys.argv[0], f"-max_total_time={int(secondes)}", f"-rss_limit_mb={MEMOIRE_MO}",
+                   f"-timeout={LENTEUR}",
                    f"-artifact_prefix={ICI / 'plantages'}/{nom}-", str(dossier)],
                   lambda data: f(data))
     (ICI / "plantages").mkdir(exist_ok=True)

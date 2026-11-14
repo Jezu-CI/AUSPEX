@@ -108,18 +108,23 @@ class FingerprintRule:
         return out or None
 
 
+def _txt(value) -> str:
+    """Champ texte d'un journal ; une valeur d'un autre type (journal forgé ou abîmé) compte pour vide."""
+    return value if isinstance(value, str) else ""
+
+
 def _answered(rec: dict) -> bool:
     """Le répondeur a-t-il vraiment répondu ? (sinon on ne sait rien de lui)"""
-    proto = (rec.get("proto") or "").lower()
+    proto = _txt(rec.get("proto")).lower()
     if proto == "tcp":
-        return rec.get("conn_state", "SF") in TCP_ESTABLISHED
+        return _txt(rec.get("conn_state", "SF")) in TCP_ESTABLISHED
     try:
         if rec.get("resp_pkts") not in (None, "", "-"):
             # Relevé sur captures réelles : une diffusion BACnet (Who-Is) n'a aucun paquet
             # en retour, mais le service détecté la faisait passer pour une réponse.
             return int(rec["resp_pkts"]) > 0
         return int(rec.get("resp_bytes") or 0) > 0 or bool(rec.get("service"))
-    except ValueError:
+    except (ValueError, TypeError, OverflowError):
         return False
 
 
@@ -321,7 +326,7 @@ class FingerprintEngine:
         self.counted: set[tuple[str, str]] = set()
 
     def _asset(self, ip: str) -> Asset | None:
-        if not ip or not self.keep(ip):
+        if not ip or not isinstance(ip, str) or not self.keep(ip):
             return None
         a = self.assets.get(ip)
         if a is None:
@@ -343,13 +348,13 @@ class FingerprintEngine:
         # Adresses MAC. Celle du DHCP est celle du client lui-même : fiable.
         # Celles de conn.log peuvent être celles d'un routeur (hôte distant) :
         # elles sont mises de côté et attribuées dans finalize().
-        if kind == "dhcp" and rec.get("mac"):
+        if kind == "dhcp" and _txt(rec.get("mac")):
             a = self._asset(rec.get("assigned_addr") or rec.get("client_addr"))
             if a:
                 self._attach_mac(a, rec["mac"])
         elif kind == "conn":
             for mfield, ipfield in (("orig_l2_addr", "id.orig_h"), ("resp_l2_addr", "id.resp_h")):
-                mac, ip = rec.get(mfield), rec.get(ipfield)
+                mac, ip = _txt(rec.get(mfield)), _txt(rec.get(ipfield))
                 if not mac or not ip or (mfield == "resp_l2_addr" and not _answered(rec)):
                     continue
                 if self.keep(ip):
