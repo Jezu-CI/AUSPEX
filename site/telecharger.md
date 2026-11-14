@@ -33,7 +33,7 @@ Suite : [Déployer le central](guide.md#déployer-le-central) ·
 | `auspex-sbom.cdx.json` | inventaire logiciel (CycloneDX) |
 | `SHA256SUMS` | empreintes des fichiers |
 | `SHA256SUMS.sigstore.json` | signature des empreintes (Sigstore) |
-| `auspex-provenance.sigstore.json` | provenance de chaque fichier (SLSA) |
+| `auspex-provenance.intoto.jsonl` | provenance de chaque fichier (SLSA) ; `auspex-provenance.sigstore.json` pour la 0.2.0 |
 
 Suite : [Appliance capteur](guide.md#appliance-capteur-iso) ·
 [Capteurs, en détail](documentation/02-capteur.md).
@@ -90,6 +90,9 @@ Provenance d'un fichier, avec [GitHub CLI](https://cli.github.com/) :
 gh attestation verify auspex-capteur-<version>.iso --repo Jezu-CI/AUSPEX \
   --signer-workflow Jezu-CI/AUSPEX/.github/workflows/version.yml
 ```
+
+Sans interroger GitHub, avec le fichier de provenance de la version :
+ajouter `--bundle auspex-provenance.intoto.jsonl`.
 
 Chaque publication vérifie ces commandes sur les vrais fichiers, et vérifie
 qu'un fichier, une liste d'empreintes ou une provenance altérés sont refusés.
