@@ -821,7 +821,7 @@ docs/              documentation (exploitation, configuration, preuves)
 | J8 | exports d'audit signés par référentiel (NIS2, DORA, IEC 62443, ISO 27001, ANSSI) | **fait** |
 | J9 | ISO durcie du capteur, envoi des logs au central, WebAuthn, carte à puce, mises à jour signées | **fait** |
 | v0.2 | versions signées (Sigstore, provenance SLSA), alerte SIEM sur les balayages, miroir des empreintes hors GitHub, OpenSSF Scorecard, fuzzing des données externes | **fait** |
-| suite | captures de terrain, Scorecard (critères liés à l'ancienneté du projet) | [en cours](https://github.com/Jezu-CI/AUSPEX/milestone/1) |
+| v0.3 | captures de terrain, Scorecard (critères liés à l'ancienneté du projet) | [à venir](https://github.com/Jezu-CI/AUSPEX/milestone/2) |
 
 ## Noms de version
 
