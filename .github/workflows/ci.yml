@@ -481,6 +481,7 @@ jobs:
             echo "::error::la mise à jour vers une version inexistante aurait dû échouer"; exit 1
           fi
           grep -q '^NETBOX_VERSION=v4.4$' .env
+          if grep -q '^NETBOX_BASE=' .env; then echo "::error::NETBOX_BASE non retiré au retour arrière"; exit 1; fi
           $A health
           after=$(docker compose exec -T auspex python -c "import os; from auspex.netbox import NetBoxClient; print(len(NetBoxClient('http://netbox:8080', os.environ['NETBOX_TOKEN']).list('/api/ipam/ip-addresses/')))")
           echo "adresses avant : $before, après retour arrière : $after"

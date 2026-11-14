@@ -86,13 +86,21 @@ def test_write_jobs_keep_no_token_on_disk(wf):
 
 @pytest.mark.parametrize("df", DOCKERFILES, ids=_ids)
 def test_dockerfile_base_pinned(df):
-    for line in df.read_text(encoding="utf-8").splitlines():
+    """Toute image de base est figée par empreinte. Une base choisie au déploiement
+    (« FROM ${ARG} ») vaut par défaut une étape figée du même fichier."""
+    text = df.read_text(encoding="utf-8")
+    stages, args = set(), dict(re.findall(r"^ARG (\w+)=(\S+)$", text, re.M))
+    for line in text.splitlines():
         if not line.startswith("FROM "):
             continue
         image = line.split()[1]
-        if "${" in image:          # version choisie au déploiement (NetBox) : tenue à jour par Dependabot
-            continue
-        assert re.search(r"@sha256:[0-9a-f]{64}$", image), line
+        m = re.fullmatch(r"\$\{(\w+)\}", image)
+        if m:
+            assert args.get(m.group(1)) in stages, line
+        elif image not in stages:
+            assert re.search(r"@sha256:[0-9a-f]{64}$", image), line
+        if " AS " in line:
+            stages.add(line.split(" AS ")[1].strip())
 
 
 def test_dependabot_covers_pinned_ecosystems():

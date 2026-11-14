@@ -6,6 +6,10 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 ## [0.3.0] — en préparation
 
+### Sécurité
+
+- **Image NetBox du central figée par empreinte**, comme toutes les autres images : la version livrée avec Auspex ne peut plus changer à l'insu du projet ; Dependabot propose chaque nouvelle empreinte, vérifiée par la CI ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). Une autre version choisie avec `update.sh --netbox` reste possible, prise à son étiquette ; `--netbox` suivi de la version livrée y revient.
+
 ### Corrigé
 
 - Publication d'une version : publier le brouillon crée le tag, qui relançait tout le workflow (vingt minutes de construction) pour finir en échec sur une version déjà publiée. La version publiée est désormais reconnue d'emblée et le reste ignoré.
