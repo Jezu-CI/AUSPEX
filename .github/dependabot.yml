@@ -19,6 +19,10 @@ updates:
 
   - package-ecosystem: pip
     directories: [/, /requirements]   # pyproject.toml et dépendances figées (tools/figer-dependances.sh)
+    # Seules les versions exactes des fichiers figés (requirements/*.txt) évoluent :
+    # les bornes de pyproject.toml restent larges (minimum réellement requis), sans
+    # être relevées à chaque nouvelle version publiée.
+    versioning-strategy: lockfile-only
     schedule: { interval: weekly, day: monday }
     groups:
       python: { patterns: ["*"] }
