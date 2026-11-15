@@ -82,6 +82,18 @@ Protocoles couverts : S7comm, S7comm-plus, Modbus, DNP3, EtherNet/IP-CIP,
 BACnet, IEC 60870-5-104, Omron FINS, HART-IP, Niagara Fox, SAIA S-Bus, plus le
 trafic IT du lab 4SICS (HTTP, SSH, TLS, SNMP, DNS, NTLM).
 
+## Vulnérabilités et licences
+
+Workflow distinct (`.github/workflows/dependances.yml`), à chaque changement
+de dépendances, chaque semaine et à la demande, avec Trivy installé à une
+version figée par son empreinte (`tools/installer-trivy.sh` ; ni
+`trivy-action` ni `setup-trivy`, détournées en mars 2026) :
+
+| Tâche | Ce qui est prouvé |
+| --- | --- |
+| Paquets Python | licences des dépendances du produit toutes compatibles avec l'AGPL v3 (`tools/verifier-licences.py`, liste explicite) ; aucune vulnérabilité corrigée de gravité moyenne ou plus |
+| Images | chaque image livrée (`tools/images-livrees.py`) analysée ; vulnérabilités hautes et critiques ayant un correctif publiées dans l'onglet Security, sans faire échouer (correctif attendu de l'éditeur, nouvelle empreinte proposée par Dependabot) |
+
 ## Lire un résultat
 
 - Annotations de la page du run : `::notice` (synthèse par preuve),

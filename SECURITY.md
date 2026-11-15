@@ -85,6 +85,12 @@ le projet est en 0.x.
   ([codeberg.org/Jezu_CI/AUSPEX-empreintes](https://codeberg.org/Jezu_CI/AUSPEX-empreintes)),
   jamais modifié ensuite, pour recouper si le compte GitHub du projet était
   compromis. Mode d'emploi : [Télécharger → Vérifier](https://jezu-ci.github.io/AUSPEX/telecharger/#v%C3%A9rifier-un-fichier-t%C3%A9l%C3%A9charg%C3%A9).
+- Dépendances surveillées : versions et empreintes figées (Python, images,
+  actions GitHub), mises à jour proposées par Dependabot, et analyse Trivy à
+  chaque changement et chaque semaine. Une vulnérabilité corrigée dans un
+  paquet Python du produit, ou une licence incompatible avec l'AGPL v3, fait
+  échouer la CI ; celles des images de conteneurs livrées sont publiées dans
+  l'onglet Security du dépôt.
 
 ## Limites connues
 
