@@ -74,6 +74,24 @@ Et autour : capteur passif (Docker ou appliance ISO durcie, mises à jour
 signées), synchronisation avec NetBox, tableau de bord et carte interactive,
 exports d'audit signés (NIS2, DORA, IEC 62443, ISO 27001, ANSSI).
 
+## Ce qu'Auspex ne voit pas
+
+L'écoute passive ne connaît que ce qui passe devant les capteurs :
+
+- un équipement **éteint ou silencieux**, ou un flux qui **ne traverse pas un
+  lien écouté** (deux machines sur le même commutateur), restent invisibles ;
+- le **contenu chiffré** n'est pas lu (seuls les échanges et ce qui est
+  annoncé en clair le sont), et Auspex n'enregistre jamais le contenu du
+  trafic ;
+- des machines **derrière une traduction d'adresses** se confondent ;
+- Auspex identifie versions et firmwares mais **ne les compare pas à une base
+  de vulnérabilités**, et il **détecte sans bloquer**.
+
+L'inventaire observé complète donc l'inventaire déclaré, il ne le remplace
+pas, et les exports d'audit **aident à démontrer** la conformité sur le
+périmètre écouté, sans la garantir. Détail et parades :
+[Ce qu'Auspex voit, ce qu'il ne voit pas](https://jezu-ci.github.io/AUSPEX/utilisateur/limites/).
+
 ## Déployer le central
 
 Prérequis : une machine Linux avec Docker et Docker Compose v2. Cible de
@@ -822,7 +840,7 @@ docs/              documentation (exploitation, configuration, preuves)
 | J8 | exports d'audit signés par référentiel (NIS2, DORA, IEC 62443, ISO 27001, ANSSI) | **fait** |
 | J9 | ISO durcie du capteur, envoi des logs au central, WebAuthn, carte à puce, mises à jour signées | **fait** |
 | v0.2 | versions signées (Sigstore, provenance SLSA), alerte SIEM sur les balayages, miroir des empreintes hors GitHub, OpenSSF Scorecard, fuzzing des données externes | **fait** |
-| v0.3 | captures de terrain, Scorecard (critères liés à l'ancienneté du projet) | [à venir](https://github.com/Jezu-CI/AUSPEX/milestone/2) |
+| v0.3 | captures de terrain, Scorecard (critères liés à l'ancienneté du projet), accessibilité (contrastes, carte sans code couleur seul) | [à venir](https://github.com/Jezu-CI/AUSPEX/milestone/2) |
 
 ## Noms de version
 

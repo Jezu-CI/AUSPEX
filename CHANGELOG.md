@@ -8,10 +8,14 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 ### Sécurité
 
+- **Analyse des vulnérabilités et des licences** (workflow « Vulnérabilités et licences », à chaque changement de dépendances et chaque semaine) : Trivy, installé à une version figée par son empreinte (pas d'action GitHub tierce : `trivy-action` et `setup-trivy` ont été détournées en mars 2026, CVE-2026-33634). Paquets Python du produit : vulnérabilité corrigée de gravité moyenne ou plus, ou licence incompatible avec l'AGPL v3 (liste explicite, `tools/verifier-licences.py`) → échec. Images livrées : vulnérabilités hautes et critiques publiées dans l'onglet Security.
 - **Image NetBox du central figée par empreinte**, comme toutes les autres images : la version livrée avec Auspex ne peut plus changer à l'insu du projet ; Dependabot propose chaque nouvelle empreinte, vérifiée par la CI ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). Une autre version choisie avec `update.sh --netbox` reste possible, prise à son étiquette ; `--netbox` suivi de la version livrée y revient.
 
 ### Ajouté
 
+- **Ce qu'Auspex voit, ce qu'il ne voit pas** : page du guide utilisateur, section du README, question de la FAQ et page anglaise. Limites de l'écoute passive (équipement silencieux, flux hors des liens écoutés, zone sans capteur, contenu chiffré, NAT, vulnérabilités non comparées, détection sans blocage) et parade pour chacune ; les exports d'audit aident à démontrer la conformité sur le périmètre écouté, sans la garantir.
+- Composants tiers : section « Site, visuels et interface » (thème du site, icônes Material Design et Font Awesome avec leur licence et l'attribution due, aucune police tierce, logos de l'auteur).
+- Feuille de route v0.3 : accessibilité, avec un état des lieux des contrastes (WCAG AA) dans [#35](https://github.com/Jezu-CI/AUSPEX/issues/35).
 - **Effacement d'un actif sur demande** (RGPD) : `auspex oublier IP… [--apply]`, simulation par défaut. Retire l'adresse de la fiche d'actif, des flux, des écarts et alertes, des envois au SIEM en attente, du tableau de bord et de la carte ; indique ce qui reste à faire hors d'Auspex (NetBox, alertes déjà livrées) et ce qui est conservé par conception (exports signés, sauvegardes, journaux bruts jusqu'à leur purge). Verrou partagé avec le cycle du service : un cycle en cours ne réécrit pas ce qui vient d'être effacé.
 - **Page « Données traitées »** pour le DPO (documentation 7) : chaque donnée, sa finalité, son emplacement et sa durée de conservation, y compris le contenu des journaux bruts Zeek.
 

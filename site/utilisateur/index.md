@@ -58,20 +58,21 @@ flowchart LR
 | responsable sécurité ou réseau | [Les notions à connaître](notions.md), [Le tableau de bord](tableau-de-bord.md), [Comprendre les écarts](ecarts.md) |
 | la personne qui tient l'inventaire | [L'inventaire dans NetBox](inventaire.md) |
 | la personne qui gère les règles de pare-feu | [Déclarer les flux autorisés](regles-de-flux.md) |
-| auditeur, ou en charge de la conformité | [Les rapports d'audit](audits.md) |
+| auditeur, ou en charge de la conformité | [Les rapports d'audit](audits.md), [Ce qu'Auspex voit, ce qu'il ne voit pas](limites.md) |
 | simple utilisateur | [Se connecter](connexion.md) |
 
 ## Les pages du guide
 
 1. [Les notions à connaître](notions.md) : zones, tiers, flux, écarts… en clair.
-2. [Mettre Auspex en route](mise-en-route.md) : de l'installation au premier écart.
-3. [Se connecter](connexion.md) : première connexion, double authentification, que faire en cas de blocage.
-4. [Le tableau de bord](tableau-de-bord.md) : lire la page d'accueil en 30 secondes.
-5. [Comprendre et traiter les écarts](ecarts.md) : chaque type d'écart, et quoi faire.
-6. [La carte des actifs](carte.md) : voir le réseau d'un coup d'œil.
-7. [L'inventaire dans NetBox](inventaire.md) : ce qu'Auspex observe, ce que vous déclarez.
-8. [Déclarer les flux autorisés](regles-de-flux.md) : le tableau des règles, colonne par colonne.
-9. [Installer un capteur](capteurs.md) : l'appliance, étape par étape.
-10. [Recevoir les alertes](alertes.md) : brancher Auspex sur votre SIEM.
-11. [Les rapports d'audit](audits.md) : produire, lire et transmettre un rapport.
-12. [Au quotidien et en cas de problème](quotidien.md) : la routine, et les réponses aux pannes courantes.
+2. [Ce qu'Auspex voit, ce qu'il ne voit pas](limites.md) : les limites de l'écoute passive, à connaître avant de lire un inventaire ou un rapport.
+3. [Mettre Auspex en route](mise-en-route.md) : de l'installation au premier écart.
+4. [Se connecter](connexion.md) : première connexion, double authentification, que faire en cas de blocage.
+5. [Le tableau de bord](tableau-de-bord.md) : lire la page d'accueil en 30 secondes.
+6. [Comprendre et traiter les écarts](ecarts.md) : chaque type d'écart, et quoi faire.
+7. [La carte des actifs](carte.md) : voir le réseau d'un coup d'œil.
+8. [L'inventaire dans NetBox](inventaire.md) : ce qu'Auspex observe, ce que vous déclarez.
+9. [Déclarer les flux autorisés](regles-de-flux.md) : le tableau des règles, colonne par colonne.
+10. [Installer un capteur](capteurs.md) : l'appliance, étape par étape.
+11. [Recevoir les alertes](alertes.md) : brancher Auspex sur votre SIEM.
+12. [Les rapports d'audit](audits.md) : produire, lire et transmettre un rapport.
+13. [Au quotidien et en cas de problème](quotidien.md) : la routine, et les réponses aux pannes courantes.
