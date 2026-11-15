@@ -7,7 +7,7 @@ name: auspex
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
     environment:
       POSTGRES_DB: netbox
       POSTGRES_USER: netbox
@@ -24,7 +24,7 @@ services:
   redis:
     # Valkey (licence BSD, fondation Linux), compatible Redis : Redis 7.4 et suivants
     # ne sont plus sous licence libre. Nom de service inchangé (NetBox l'attend).
-    image: valkey/valkey:8-alpine
+    image: valkey/valkey:8-alpine@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
     command: ["valkey-server", "--save", "", "--appendonly", "no"]  # cache uniquement
     restart: unless-stopped
 
