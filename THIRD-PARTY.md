@@ -1,7 +1,9 @@
 # Composants tiers
 
 Auspex est publié sous licence GNU AGPL v3 (voir [LICENSE](LICENSE) et
-[NOTICE](NOTICE)). Toutes les licences ci-dessous sont compatibles avec elle. Il
+[NOTICE](NOTICE)). Toutes les licences ci-dessous sont compatibles avec elle ; pour les
+bibliothèques Python du produit, c'est vérifié à chaque changement par la CI
+(`tools/verifier-licences.py`). Il
 s'appuie sur des composants tiers, chacun sous sa propre licence, qui reste
 la leur. Ce dépôt ne contient le code d'aucun d'eux : les images Docker et
 l'ISO du capteur les téléchargent depuis leurs sources officielles à la
