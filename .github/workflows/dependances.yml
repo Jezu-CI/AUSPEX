@@ -60,9 +60,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Dépendances du produit (figées, empreintes vérifiées)
-        run: |
-          python -m venv "$RUNNER_TEMP/produit"
-          "$RUNNER_TEMP/produit/bin/pip" install -q --require-hashes -r requirements/execution.txt
+        # Dossier qui ne contient qu'elles : pas d'environnement virtuel, dont
+        # le pip serait analysé comme s'il faisait partie du produit.
+        run: pip install -q --target "$RUNNER_TEMP/produit" --require-hashes -r requirements/execution.txt
       - name: Trivy (version figée)
         run: tools/installer-trivy.sh "$RUNNER_TEMP/bin"
       - name: Licences compatibles avec l'AGPL v3
