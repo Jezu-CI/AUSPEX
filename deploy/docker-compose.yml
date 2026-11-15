@@ -34,7 +34,8 @@ services:
       context: ..
       dockerfile: deploy/netbox/Dockerfile
       args:
-        NETBOX_VERSION: ${NETBOX_VERSION:-v4.4}
+        # Vide : version livrée, figée par empreinte (voir netbox/Dockerfile)
+        NETBOX_BASE: ${NETBOX_BASE:-netbox-livree}
     image: auspex-netbox:${NETBOX_VERSION:-v4.4}
     depends_on:
       postgres:

@@ -6,6 +6,10 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 ## [0.3.0] — en préparation
 
+### Sécurité
+
+- **Image NetBox du central figée par empreinte**, comme toutes les autres images : la version livrée avec Auspex ne peut plus changer à l'insu du projet ; Dependabot propose chaque nouvelle empreinte, vérifiée par la CI ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). Une autre version choisie avec `update.sh --netbox` reste possible, prise à son étiquette ; `--netbox` suivi de la version livrée y revient.
+
 ### Changé
 
 - Fichier de provenance des versions renommé `auspex-provenance.intoto.jsonl` (même contenu, sur une ligne) : extension reconnue comme provenance SLSA, notamment par OpenSSF Scorecard ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). La 0.2.0 garde `auspex-provenance.sigstore.json`.

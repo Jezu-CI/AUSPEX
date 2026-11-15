@@ -419,3 +419,37 @@ def test_versions_consistent():
     assert re.search(rf'^version = "{re.escape(code)}"', (root / "pyproject.toml").read_text(), re.M)
     assert f'version = "{code}"' in (root / "netbox-plugin/netbox_auspex/__init__.py").read_text()
     assert f"## [{code}]" in (root / "CHANGELOG.md").read_text()
+
+
+def test_netbox_shipped_version_consistent():
+    """Version de NetBox livrée : la même partout (image figée, installation, compose)."""
+    import re
+    df = (DEPLOY / "netbox" / "Dockerfile").read_text()
+    tag = re.search(r"^FROM netboxcommunity/netbox:([^@]+)@sha256:[0-9a-f]{64} AS netbox-livree$", df, re.M).group(1)
+    assert f"\nNETBOX_VERSION={tag}\n" in (DEPLOY / "install.sh").read_text()
+    c = yaml.safe_load((DEPLOY / "docker-compose.yml").read_text())
+    assert c["services"]["netbox"]["image"] == f"auspex-netbox:${{NETBOX_VERSION:-{tag}}}"
+    assert c["services"]["netbox"]["build"]["args"] == {"NETBOX_BASE": "${NETBOX_BASE:-netbox-livree}"}
+
+
+@pytest.mark.parametrize("avant, cible, version, base", [
+    ("", "v4.4.5", "v4.4.5", "netboxcommunity/netbox:v4.4.5"),            # autre version : à son étiquette
+    ("NETBOX_BASE=netboxcommunity/netbox:v4.4.5\n", "v4.4", "v4.4", None),  # retour à la version livrée
+    ("NETBOX_BASE=netboxcommunity/netbox:v4.4.5\n", "v4.4.6", "v4.4.6", "netboxcommunity/netbox:v4.4.6"),
+])
+def test_update_netbox_version_block(tmp_path, avant, cible, version, base):
+    """Le bloc « Versions » d'update.sh s'exécute tel quel sur un .env réel."""
+    import subprocess
+    src = (DEPLOY / "update.sh").read_text()
+    fonctions = "\n".join(l for l in src.splitlines() if l.startswith(("env_get()", "netbox_livree()")))
+    bloc = src[src.index('if [ -n "$NETBOX_TARGET" ]; then\n    sed -i "s/^NETBOX_VERSION'):]
+    bloc = bloc[:bloc.index("\nfi\n") + 4]
+    (tmp_path / "netbox").mkdir()
+    (tmp_path / "netbox" / "Dockerfile").write_text((DEPLOY / "netbox" / "Dockerfile").read_text())
+    (tmp_path / ".env").write_text("NETBOX_VERSION=v4.4.5\n" + avant + "DB_PASSWORD=x\n")
+    r = subprocess.run(["bash", "-euc", f"NETBOX_TARGET={cible}\n{fonctions}\n{bloc}"], cwd=tmp_path,
+                       capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    env = dict(l.split("=", 1) for l in (tmp_path / ".env").read_text().splitlines())
+    assert env["NETBOX_VERSION"] == version and env["DB_PASSWORD"] == "x"
+    assert env.get("NETBOX_BASE") == base

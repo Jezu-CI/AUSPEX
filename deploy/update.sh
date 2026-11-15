@@ -3,6 +3,7 @@
 #
 #   ./update.sh                         reconstruit et redémarre (même versions)
 #   ./update.sh --netbox v4.4.5         change la version de NetBox
+#                                       (--netbox v4.4 : retour à la version livrée)
 #   ./update.sh --auspex v0.2.0         passe Auspex à un tag du dépôt
 #
 # Déroulé : sauvegarde (base NetBox, état Auspex, .env) → changement de
@@ -35,6 +36,8 @@ say()  { printf '\n\033[1m%s\033[0m\n' "$*"; }
 rand_hex() { ( set +o pipefail; LC_ALL=C tr -dc 'a-f0-9' </dev/urandom | head -c "$1" ); }
 # Lecture de .env sans le charger dans le shell (voir install.sh).
 env_get() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
+# Version de NetBox livrée avec Auspex (étiquette de l'image figée).
+netbox_livree() { sed -n 's|^FROM netboxcommunity/netbox:\([^@]*\)@sha256:[0-9a-f]\{64\} AS netbox-livree$|\1|p' netbox/Dockerfile; }
 [ -f .env ] || { echo "Erreur : .env absent, lancer d'abord ./install.sh" >&2; exit 2; }
 CURRENT_NETBOX=$(env_get NETBOX_VERSION)
 
@@ -169,6 +172,12 @@ rollback() {
 say "2/4 Versions"
 if [ -n "$NETBOX_TARGET" ]; then
     sed -i "s/^NETBOX_VERSION=.*/NETBOX_VERSION=${NETBOX_TARGET}/" .env
+    # Version livrée avec Auspex : image figée par empreinte. Autre version :
+    # image prise à son étiquette (NETBOX_BASE), au choix de l'administrateur.
+    sed -i '/^NETBOX_BASE=/d' .env
+    if [ "$NETBOX_TARGET" != "$(netbox_livree)" ]; then
+        echo "NETBOX_BASE=netboxcommunity/netbox:${NETBOX_TARGET}" >> .env
+    fi
     echo "NetBox → $NETBOX_TARGET"
 fi
 if [ -n "$AUSPEX_TARGET" ]; then

@@ -1,12 +1,18 @@
 # Image NetBox du central : NetBox officiel + plugin Auspex.
 # Construite depuis la racine du dépôt :
-#   docker build -f deploy/netbox/Dockerfile --build-arg NETBOX_VERSION=v4.4 .
+#   docker build -f deploy/netbox/Dockerfile .
+#
+# Base : la version de NetBox livrée et testée avec Auspex, figée par son
+# empreinte (tenue à jour par Dependabot, vérifiée par la CI). Une autre
+# version choisie par l'administrateur (update.sh --netbox vX.Y.Z) est passée
+# dans NETBOX_BASE et prise à son étiquette, sous sa responsabilité.
 #
 # Le plugin et le moteur Auspex sont du Python pur : ils sont copiés tels
 # quels, sans téléchargement, pour qu'une mise à jour fonctionne aussi sur un
 # site sans accès à Internet.
-ARG NETBOX_VERSION=v4.4
-FROM netboxcommunity/netbox:${NETBOX_VERSION}
+ARG NETBOX_BASE=netbox-livree
+FROM netboxcommunity/netbox:v4.4@sha256:14c2de3f179d8ed5b5722a76b6d7389c8c95bb8be46c600f3d7fe1f7698b4574 AS netbox-livree
+FROM ${NETBOX_BASE}
 
 COPY src/auspex /opt/auspex-lib/auspex
 COPY netbox-plugin/netbox_auspex /opt/auspex-lib/netbox_auspex
