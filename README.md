@@ -711,6 +711,7 @@ et vérifier avec `auspex module check`.
 | `auspex rules export FICHIER` | exporte les règles actives en CSV |
 | `auspex analyze --logs RÉP` | ingère les **nouveaux** logs, identifie, évalue, envoie les alertes |
 | `auspex assets [--zone Z] [--json]` | inventaire identifié |
+| `auspex oublier IP… [--apply]` | effacer un ou plusieurs actifs et leur historique (RGPD ; simulation par défaut) ; voir [Données traitées](docs/07-donnees-traitees.md) |
 | `auspex findings [--min-severity high]` | écarts ouverts |
 | `auspex alerts test` | envoie une alerte factice à chaque sortie configurée |
 | `auspex netbox setup [--apply]` | crée les champs Auspex dans NetBox |

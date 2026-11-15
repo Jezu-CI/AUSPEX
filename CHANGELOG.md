@@ -10,12 +10,19 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 - **Image NetBox du central figée par empreinte**, comme toutes les autres images : la version livrée avec Auspex ne peut plus changer à l'insu du projet ; Dependabot propose chaque nouvelle empreinte, vérifiée par la CI ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). Une autre version choisie avec `update.sh --netbox` reste possible, prise à son étiquette ; `--netbox` suivi de la version livrée y revient.
 
+### Ajouté
+
+- **Effacement d'un actif sur demande** (RGPD) : `auspex oublier IP… [--apply]`, simulation par défaut. Retire l'adresse de la fiche d'actif, des flux, des écarts et alertes, des envois au SIEM en attente, du tableau de bord et de la carte ; indique ce qui reste à faire hors d'Auspex (NetBox, alertes déjà livrées) et ce qui est conservé par conception (exports signés, sauvegardes, journaux bruts jusqu'à leur purge). Verrou partagé avec le cycle du service : un cycle en cours ne réécrit pas ce qui vient d'être effacé.
+- **Page « Données traitées »** pour le DPO (documentation 7) : chaque donnée, sa finalité, son emplacement et sa durée de conservation, y compris le contenu des journaux bruts Zeek.
+
 ### Changé
 
 - Fichier de provenance des versions renommé `auspex-provenance.intoto.jsonl` (même contenu, sur une ligne) : extension reconnue comme provenance SLSA, notamment par OpenSSF Scorecard ([#4](https://github.com/Jezu-CI/AUSPEX/issues/4)). La 0.2.0 garde `auspex-provenance.sigstore.json`.
 
 ### Corrigé
 
+- Les **alertes résolues** n'étaient jamais purgées : elles le sont désormais après `retention_days`, comme les actifs et les flux.
+- Les **journaux des conteneurs** du central n'étaient pas bornés (ils contiennent les événements de connexion) : rotation à 5 fichiers de 10 Mo par service.
 - Publication d'une version : publier le brouillon crée le tag, qui relançait tout le workflow (vingt minutes de construction) pour finir en échec sur une version déjà publiée. La version publiée est désormais reconnue d'emblée et le reste ignoré.
 
 ## [0.2.0] « Lantern in the Void » — 2026-11-14
