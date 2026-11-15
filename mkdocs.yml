@@ -80,6 +80,7 @@ nav:
   - Guide utilisateur:
       - utilisateur/index.md
       - Les notions à connaître: utilisateur/notions.md
+      - Ce qu'Auspex voit et ne voit pas: utilisateur/limites.md
       - Mettre Auspex en route: utilisateur/mise-en-route.md
       - Se connecter: utilisateur/connexion.md
       - Le tableau de bord: utilisateur/tableau-de-bord.md
