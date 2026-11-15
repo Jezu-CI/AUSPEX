@@ -1,0 +1,133 @@
+name: Vulnérabilités et licences
+
+# Analyse des dépendances livrées avec Auspex, avec Trivy (installé à une
+# version figée par son empreinte : tools/installer-trivy.sh).
+#
+# - Paquets Python du produit (requirements/execution.txt) : vulnérabilités
+#   corrigées par l'éditeur (gravité moyenne ou plus) → échec ; licences
+#   toutes compatibles avec l'AGPL v3 (tools/verifier-licences.py) → sinon
+#   échec.
+# - Images de conteneurs livrées (tools/images-livrees.py) : vulnérabilités
+#   hautes et critiques ayant un correctif, publiées dans l'onglet Security
+#   du dépôt. Elles ne font pas échouer : le correctif vient de l'éditeur de
+#   l'image, et Dependabot propose chaque nouvelle empreinte.
+#
+# À chaque changement de dépendances, chaque semaine (nouvelles CVE sur des
+# versions inchangées) et à la demande.
+on:
+  pull_request:
+    paths:
+      - "requirements/**"
+      - "deploy/**"
+      - "sensor/**"
+      - "appliance/**"
+      - "tools/installer-trivy.sh"
+      - "tools/verifier-licences.py"
+      - "tools/images-livrees.py"
+      - ".github/workflows/dependances.yml"
+  push:
+    branches: [main]
+    paths:
+      - "requirements/**"
+      - "deploy/**"
+      - "sensor/**"
+      - "appliance/**"
+      - "tools/installer-trivy.sh"
+      - "tools/verifier-licences.py"
+      - "tools/images-livrees.py"
+      - ".github/workflows/dependances.yml"
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python:
+    name: Paquets Python (vulnérabilités, licences)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Dépendances du produit (figées, empreintes vérifiées)
+        run: |
+          python -m venv "$RUNNER_TEMP/produit"
+          "$RUNNER_TEMP/produit/bin/pip" install -q --require-hashes -r requirements/execution.txt
+      - name: Trivy (version figée)
+        run: tools/installer-trivy.sh "$RUNNER_TEMP/bin"
+      - name: Licences compatibles avec l'AGPL v3
+        run: |
+          "$RUNNER_TEMP/bin/trivy" rootfs --quiet --scanners license --format json \
+            -o licences.json "$RUNNER_TEMP/produit"
+          python tools/verifier-licences.py licences.json
+      - name: Vulnérabilités corrigées (gravité moyenne ou plus)
+        run: |
+          "$RUNNER_TEMP/bin/trivy" rootfs --quiet --scanners vuln --ignore-unfixed \
+            --severity MEDIUM,HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/produit"
+
+  liste:
+    name: Images livrées
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      images: ${{ steps.liste.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: liste
+        run: echo "images=$(python3 tools/images-livrees.py)" >> "$GITHUB_OUTPUT"
+
+  image:
+    name: Image ${{ matrix.image }}
+    needs: liste
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.liste.outputs.images) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Trivy (version figée)
+        run: tools/installer-trivy.sh "$RUNNER_TEMP/bin"
+      - name: Analyse
+        id: analyse
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          # Catégorie stable par image (nom sans étiquette ni empreinte).
+          nom="${IMAGE%%@*}"; nom="${nom%%:*}"
+          echo "categorie=trivy-${nom//\//-}" >> "$GITHUB_OUTPUT"
+          "$RUNNER_TEMP/bin/trivy" image --quiet --scanners vuln --ignore-unfixed \
+            --severity HIGH,CRITICAL --format json -o trivy.json "$IMAGE"
+          "$RUNNER_TEMP/bin/trivy" convert --format sarif -o trivy.sarif trivy.json
+          {
+            echo "### $IMAGE"
+            echo
+            echo '```'
+            "$RUNNER_TEMP/bin/trivy" convert --format table trivy.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        # Publication dans l'onglet Security : pas pour les demandes de fusion
+        # venues d'une copie du dépôt (jeton en lecture seule).
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          sarif_file: trivy.sarif
+          category: ${{ steps.analyse.outputs.categorie }}
