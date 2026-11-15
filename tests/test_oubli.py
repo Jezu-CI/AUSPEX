@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -47,8 +48,9 @@ def _fichiers(etat):
 
 
 def _cite(etat, ip):
-    return [p.name for p, b in _fichiers(etat).items()
-            if f'"{ip}"'.encode() in b or f'"{ip}/'.encode() in b]
+    """Fichiers où l'adresse apparaît, y compris dans un texte (message d'alerte)."""
+    motif = re.compile(rf"(?<![0-9A-Za-z.:]){re.escape(ip)}(?![0-9A-Za-z]|\.[0-9])".encode())
+    return [p.name for p, b in _fichiers(etat).items() if motif.search(b)]
 
 
 def test_simulation_ne_modifie_rien(site, capsys):
@@ -135,3 +137,28 @@ def test_journaux_des_conteneurs_bornes():
     compose = yaml.safe_load((Path(__file__).resolve().parent.parent / "deploy/docker-compose.yml").read_text())
     for nom, svc in compose["services"].items():
         assert svc.get("logging", {}).get("options", {}).get("max-size"), nom
+
+
+def test_adresse_citee_seulement_dans_le_message(tmp_path):
+    """Équipement à plusieurs adresses (« actif silencieux ») : le champ src ne porte
+    que la première, le message les cite toutes. Effacer la seconde retire l'alerte,
+    l'envoi en attente et l'écart du rapport ; une adresse voisine n'est pas touchée."""
+    from auspex.oubli import oublier
+    msg = "automate-3 (10.0.0.5, 10.0.0.7) est déclaré actif mais n'a pas été observé depuis le 2026-11-01"
+    finding = {"id": "AUSPEX-1", "type": "actif_silencieux", "src": "10.0.0.5", "message": msg}
+    voisin = {"id": "AUSPEX-2", "type": "actif_silencieux", "src": "10.0.0.70",
+              "message": "automate-4 (10.0.0.70, 10.0.0.77:502, fd00::7) …"}
+    (tmp_path / "alerts.json").write_text(json.dumps({
+        "AUSPEX-1": {"status": "open", "finding": finding}, "AUSPEX-2": {"status": "open", "finding": voisin}}))
+    (tmp_path / "report.json").write_text(json.dumps({"findings_detail": [finding, voisin]}))
+    (tmp_path / "outbox").mkdir()
+    (tmp_path / "outbox" / "00-syslog.jsonl").write_text(
+        json.dumps({"event": "open", "message": msg}) + "\n" + json.dumps({"event": "open", **voisin}) + "\n")
+    bilan = oublier(tmp_path, {"10.0.0.7"}, appliquer=True)
+    assert (bilan.alertes, bilan.envois, bilan.vues) == (1, 1, {"report.json": 1})
+    assert set(json.loads((tmp_path / "alerts.json").read_text())) == {"AUSPEX-2"}
+    assert json.loads((tmp_path / "report.json").read_text()) == {"findings_detail": [voisin]}
+    assert "10.0.0.7," not in (tmp_path / "outbox" / "00-syslog.jsonl").read_text()
+    # Adresse avec port, et IPv6 écrite autrement : reconnues aussi
+    assert oublier(tmp_path, {"10.0.0.77"}, appliquer=False).alertes == 1
+    assert oublier(tmp_path, {"fd00:0:0:0:0:0:0:7"}, appliquer=False).alertes == 1

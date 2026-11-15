@@ -25,6 +25,7 @@ from __future__ import annotations
 import fcntl
 import ipaddress
 import json
+import re
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -74,9 +75,29 @@ def adresses(valeurs: list[str]) -> set[str]:
     return out
 
 
+# Adresses écrites dans un texte : « 10.0.0.5 », « 10.0.0.5/24 », « 10.0.0.5:502 »,
+# « fd00::7 ». Chaque candidat est relu par ipaddress (une heure ou une adresse
+# MAC n'est pas une adresse IP) et comparé sous sa forme canonique.
+_IPV4 = re.compile(r"(?<![0-9.])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9]|\.[0-9])")
+_IPV6 = re.compile(r"(?<![0-9A-Fa-f:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![0-9A-Fa-f:])")
+
+
+def _canonique(valeur: str) -> str | None:
+    try:
+        return str(ipaddress.ip_address(valeur))
+    except ValueError:
+        return None
+
+
 def _cite(valeur, ips: set[str]) -> bool:
-    """Valeur scalaire qui désigne l'une des adresses (« 10.0.0.5 » ou « 10.0.0.5/24 »)."""
-    return isinstance(valeur, str) and valeur.split("/")[0] in ips
+    """Valeur scalaire qui désigne l'une des adresses, seule (« 10.0.0.5 »,
+    « 10.0.0.5/24 ») ou dans un texte (message d'alerte qui cite plusieurs
+    adresses d'un même équipement)."""
+    if not isinstance(valeur, str):
+        return False
+    if _canonique(valeur.split("/")[0]) in ips:
+        return True
+    return any(_canonique(m) in ips for motif in (_IPV4, _IPV6) for m in motif.findall(valeur))
 
 
 def _cite_directement(d: dict, ips: set[str]) -> bool:
@@ -141,19 +162,20 @@ class Bilan:
 def oublier(state_dir: Path, ips: set[str], appliquer: bool) -> Bilan:
     """Calcule (et, si `appliquer`, écrit) l'effacement des adresses `ips`."""
     state_dir = Path(state_dir)
+    ips = {_canonique(i) or i for i in ips}
     bilan = Bilan()
     ecritures: list[tuple[Path, object]] = []
 
     p = state_dir / "assets.json"
     actifs = _read(p, [])
-    garder = [a for a in actifs if a.get("ip") not in ips]
+    garder = [a for a in actifs if not _cite(a.get("ip"), ips)]
     bilan.actifs = len(actifs) - len(garder)
     if bilan.actifs:
         ecritures.append((p, garder))
 
     p = state_dir / "flows.json"
     flux = _read(p, [])
-    garder = [f for f in flux if f.get("src") not in ips and f.get("dst") not in ips]
+    garder = [f for f in flux if not (_cite(f.get("src"), ips) or _cite(f.get("dst"), ips))]
     bilan.flux = len(flux) - len(garder)
     if bilan.flux:
         ecritures.append((p, garder))
