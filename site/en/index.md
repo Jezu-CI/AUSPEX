@@ -61,6 +61,17 @@ signed NIS2 audit report (captions in French).
 3. **Teams consult** NetBox, receive alerts in their SIEM and hand the signed
    exports to auditors.
 
+## What Auspex does not see
+
+Passive listening only knows what crosses its sensors: a device that is off or
+silent, a flow that never reaches a mirrored link (two machines on the same
+switch), or a zone without a sensor stay invisible. Encrypted content is not
+read, and Auspex never stores traffic content. Identified versions and
+firmware are not matched against a vulnerability database, and Auspex detects
+without blocking. The observed inventory complements the declared one in
+NetBox; audit exports **help demonstrate** compliance on the monitored scope,
+they do not guarantee it ([details, in French](../utilisateur/limites.md)).
+
 ## Proven, not promised
 
 Every change is automatically tested on the real product: full central

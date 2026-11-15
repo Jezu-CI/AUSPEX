@@ -44,6 +44,18 @@ FoxIO (JA4S, JA4H, JA4X, JA4SSH…) relèvent de la FoxIO License 1.1, qui
 n'autorise pas l'usage monétisé sans licence OEM : incompatible avec l'usage
 libre, y compris commercial, que permet la licence d'Auspex.
 
+## Site, visuels et interface
+
+| Élément | Licence | Remarque |
+| --- | --- | --- |
+| Logos et icône Auspex, logo Jezu-CI | © Yann Mathon | créations originales de l'auteur pour le projet ; aucune ressource tierce |
+| Thème Material for MkDocs | MIT | outil de construction du site, non embarqué dans le produit |
+| Icônes Material Design (Pictogrammers) | Apache 2.0 | pictogrammes de la page d'accueil, bascule clair / sombre |
+| Icône GitHub (Font Awesome Free) | CC BY 4.0 | lien vers le dépôt ; attribution : Font Awesome by Fonticons, Inc. (fontawesome.com) |
+| Mermaid (rendu des schémas) | MIT | utilisé à la construction ; le site ne contient que les images produites |
+| Polices | aucune police tierce | le site et l'interface utilisent les polices du système (aucun chargement externe) |
+| Scripts de la carte et de WebAuthn (plugin NetBox) | AGPL v3 | écrits pour Auspex, sans bibliothèque tierce |
+
 ## Données
 
 - Préfixes MAC (`rules/oui.yaml`) : sous-ensemble du registre public de

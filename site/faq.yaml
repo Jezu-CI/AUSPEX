@@ -56,6 +56,14 @@
     par exigence, vérifiables sans Auspex ([exports d'audit](documentation/03-audits.md)).
     Chaque écart porte ses références réglementaires. Auspex ne rend pas conforme à lui
     seul : il documente l'inventaire et la segmentation, deux exigences centrales de ces textes.
+- q: Qu'est-ce qu'Auspex ne voit pas ?
+  a: >-
+    Ce qui ne passe pas devant ses capteurs : un équipement éteint ou silencieux, un flux
+    entre deux machines du même commutateur si le port miroir ne le recopie pas, une zone
+    sans capteur. Il ne lit pas le contenu chiffré, ne compare pas les versions identifiées
+    à une base de vulnérabilités et détecte sans bloquer. L'inventaire observé complète
+    l'inventaire déclaré dans NetBox, il ne le remplace pas
+    ([détail et parades](utilisateur/limites.md)).
 - q: Faut-il NetBox pour utiliser Auspex ?
   a: >-
     Oui. Auspex s'installe avec NetBox (fourni par l'installation) et écrit l'inventaire
