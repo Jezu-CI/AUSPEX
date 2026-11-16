@@ -103,6 +103,7 @@ nav:
       - Exploitation: documentation/04-exploitation.md
       - Référence de configuration: documentation/05-configuration.md
       - Preuves automatisées: documentation/06-preuves-ci.md
+      - Données traitées (RGPD): documentation/07-donnees-traitees.md
   - Projet:
       - Versions: versions.md
       - Sécurité: securite.md

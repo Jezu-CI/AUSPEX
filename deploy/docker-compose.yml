@@ -5,8 +5,17 @@
 
 name: auspex
 
+# Journaux des conteneurs bornés (rotation) : ils contiennent les événements de
+# connexion (identifiant, adresse IP) ; voir « Données traitées ».
+x-journaux: &journaux
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
+    logging: *journaux
     image: postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
     environment:
       POSTGRES_DB: netbox
@@ -22,6 +31,7 @@ services:
     restart: unless-stopped
 
   redis:
+    logging: *journaux
     # Valkey (licence BSD, fondation Linux), compatible Redis : Redis 7.4 et suivants
     # ne sont plus sous licence libre. Nom de service inchangé (NetBox l'attend).
     image: valkey/valkey:8-alpine@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
@@ -29,6 +39,7 @@ services:
     restart: unless-stopped
 
   netbox:
+    logging: *journaux
     # NetBox officiel + plugin Auspex (restriction des connexions par IP source)
     build:
       context: ..
@@ -80,6 +91,7 @@ services:
     restart: unless-stopped
 
   auspex:
+    logging: *journaux
     build:
       context: ..
       dockerfile: deploy/central/Dockerfile
@@ -106,6 +118,7 @@ services:
     restart: unless-stopped
 
   acces:
+    logging: *journaux
     # Front HTTPS devant NetBox (certificat et clé dans tls/, hors de config/ :
     # NetBox, qui lit config/, ne voit jamais la clé privée), et port de
     # connexion par carte à puce quand auth.carte est configurée.
@@ -139,6 +152,7 @@ services:
     restart: unless-stopped
 
   reception:
+    logging: *journaux
     # Réception des logs des capteurs : SSH + rsync en écriture seule, un dossier
     # par capteur ; mises à jour signées en lecture seule. Seuls les capteurs déclarés avec une clé (sensors[].key) entrent.
     build:

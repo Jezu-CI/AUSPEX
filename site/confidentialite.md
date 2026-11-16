@@ -9,6 +9,10 @@ description: "Confidentialité sur le site d'Auspex : aucun cookie, aucune mesur
 charge aucune ressource depuis un autre site.** C'est pourquoi aucun bandeau de
 consentement ne s'affiche.
 
+Cette page concerne **le site**. Pour les données que traite **le logiciel**
+Auspex une fois installé chez vous (à l'intention de votre DPO), voir
+[Données traitées](documentation/07-donnees-traitees.md).
+
 ## Ce que l'éditeur collecte
 
 Rien. Le site est composé de pages statiques : pas de compte, pas de

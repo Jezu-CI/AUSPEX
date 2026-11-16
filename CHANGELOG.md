@@ -17,6 +17,8 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 - **Ce qu'Auspex voit, ce qu'il ne voit pas** : page du guide utilisateur, section du README, question de la FAQ et page anglaise. Limites de l'écoute passive (équipement silencieux, flux hors des liens écoutés, zone sans capteur, contenu chiffré, NAT, vulnérabilités non comparées, détection sans blocage) et parade pour chacune ; les exports d'audit aident à démontrer la conformité sur le périmètre écouté, sans la garantir.
 - Composants tiers : section « Site, visuels et interface » (thème du site, icônes Material Design et Font Awesome avec leur licence et l'attribution due, aucune police tierce, logos de l'auteur).
 - Feuille de route v0.3 : accessibilité, avec un état des lieux des contrastes (WCAG AA) dans [#35](https://github.com/Jezu-CI/AUSPEX/issues/35).
+- **Effacement d'un actif sur demande** (RGPD) : `auspex oublier IP… [--apply]`, simulation par défaut. Retire l'adresse de la fiche d'actif, des flux, des écarts et alertes, des envois au SIEM en attente, du tableau de bord et de la carte ; indique ce qui reste à faire hors d'Auspex (NetBox, alertes déjà livrées) et ce qui est conservé par conception (exports signés, sauvegardes, journaux bruts jusqu'à leur purge). Verrou partagé avec le cycle du service : un cycle en cours ne réécrit pas ce qui vient d'être effacé.
+- **Page « Données traitées »** pour le DPO (documentation 7) : chaque donnée, sa finalité, son emplacement et sa durée de conservation, y compris le contenu des journaux bruts Zeek.
 
 ### Changé
 
@@ -24,6 +26,8 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 ### Corrigé
 
+- Les **alertes résolues** n'étaient jamais purgées : elles le sont désormais après `retention_days`, comme les actifs et les flux.
+- Les **journaux des conteneurs** du central n'étaient pas bornés (ils contiennent les événements de connexion) : rotation à 5 fichiers de 10 Mo par service.
 - Publication d'une version : publier le brouillon crée le tag, qui relançait tout le workflow (vingt minutes de construction) pour finir en échec sur une version déjà publiée. La version publiée est désormais reconnue d'emblée et le reste ignoré.
 
 ## [0.2.0] « Lantern in the Void » — 2026-11-14

@@ -14,6 +14,7 @@ prouve à chaque modification.
 | [4. Exploitation](04-exploitation.md) | installation, mise à jour et retour arrière, sauvegardes, santé, journaux, dépannage |
 | [5. Référence de configuration](05-configuration.md) | `auspex.yaml`, `.env`, `capteur.conf` : chaque clé, sorties SIEM |
 | [6. Preuves automatisées](06-preuves-ci.md) | ce que la CI vérifie à chaque modification, et comment |
+| [7. Données traitées (RGPD)](07-donnees-traitees.md) | pour le DPO : chaque donnée, sa finalité, sa durée de conservation ; effacement d'un actif |
 
 Engagements et limites de sécurité : [SECURITY.md](../SECURITY.md).
 

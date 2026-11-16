@@ -164,6 +164,18 @@ class AlertStore:
         _atomic_write(self.path, alerts)
         return events
 
+    def prune(self, now: datetime, retention_days: int) -> int:
+        """Retire les alertes résolues depuis plus de `retention_days` (elles citent des
+        adresses : même durée de conservation que les actifs et les flux)."""
+        alerts = self.load()
+        limit = now - timedelta(days=retention_days)
+        keep = {k: a for k, a in alerts.items()
+                if a.get("status") != "resolved" or not a.get("resolved_at")
+                or datetime.fromisoformat(a["resolved_at"]) >= limit}
+        if len(keep) != len(alerts):
+            _atomic_write(self.path, keep)
+        return len(alerts) - len(keep)
+
     def open_alerts(self) -> list[dict]:
         return [a for a in self.load().values() if a["status"] == "open"]
 

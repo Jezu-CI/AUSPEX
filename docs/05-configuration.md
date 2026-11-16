@@ -17,7 +17,7 @@ Exemple complet : [`examples/auspex.yaml.example`](../examples/auspex.yaml.examp
 | `channel` | `stable` | `stable`, `edge`, `offline` (site isolé) |
 | `organisation` | — | nom affiché dans les exports d'audit (≤ 120 caractères) |
 | `state_dir` | `state` | données d'exécution |
-| `retention_days` | `180` | conservation des observations (entier ≥ 1) |
+| `retention_days` | `180` | conservation des observations : actifs et flux non revus, alertes résolues (entier ≥ 1 ; voir [Données traitées](07-donnees-traitees.md)) |
 | `fingerprint_rules` | — | fichiers ou dossiers de règles d'identification supplémentaires |
 | `modules` | `[]` | `github.com/org/depot@version` (version épinglée, une seule fois chacun) |
 
