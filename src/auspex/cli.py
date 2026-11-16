@@ -217,7 +217,9 @@ def run_analysis(cfg: Config, logs: Path, now_arg: str | None = None, send: bool
     asset_store.save(assets)
     ledger.prune(cfg.retention_days)
     ledger.save()
-    events = AlertStore(cfg.state_dir).reconcile(report.findings, now)
+    alert_store = AlertStore(cfg.state_dir)
+    events = alert_store.reconcile(report.findings, now)
+    pruned_al = alert_store.prune(now, cfg.retention_days)
 
     errors = []
     if send and cfg.alerts.outputs:
@@ -230,7 +232,7 @@ def run_analysis(cfg: Config, logs: Path, now_arg: str | None = None, send: bool
         "flows_covered": report.flows_covered, "assets": len(assets), "rules": len(rules),
         "findings": report.by_type(),
         "events": {k: sum(1 for e in events if e["event"] == k) for k in ("open", "update", "resolve")},
-        "pruned": {"flows": pruned_f, "assets": pruned_a}, "delivery_errors": errors,
+        "pruned": {"flows": pruned_f, "assets": pruned_a, "alerts": pruned_al}, "delivery_errors": errors,
     }
     (cfg.state_dir / "report.json").write_text(
         json.dumps({**summary, "findings_detail": [f.to_dict() for f in report.findings]},
@@ -269,6 +271,46 @@ def cmd_analyze(args) -> int:
     for e in errors:
         print(f"  ⚠ envoi : {e}")
     return 3 if errors else 0
+
+
+def cmd_forget(args) -> int:
+    """Effacement d'actifs (RGPD) : simulation par défaut, --apply pour effacer."""
+    from .oubli import OubliError, adresses, oublier, verrou_etat
+    cfg = _load(args)
+    try:
+        ips = adresses(args.ip)
+        with verrou_etat(cfg.state_dir):
+            bilan = oublier(cfg.state_dir, ips, appliquer=args.apply)
+            if args.apply and bilan.total:
+                try:  # tableau de bord et carte recalculés tout de suite
+                    from .dashboard import write_snapshot
+                    write_snapshot(cfg, normalizer=_rule_data(cfg)[2])
+                except Exception as exc:  # noqa: BLE001 - recalculés de toute façon au cycle suivant
+                    print(f"(tableau de bord recalculé au prochain cycle : {exc})")
+    except OubliError as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"Adresse(s) : {', '.join(sorted(ips))}")
+    print(f"  fiche d'actif            : {bilan.actifs}")
+    print(f"  flux                     : {bilan.flux}")
+    print(f"  alertes et écarts        : {bilan.alertes}")
+    print(f"  envois au SIEM en attente: {bilan.envois}")
+    for nom, n in bilan.vues.items():
+        print(f"  {nom:<25}: {n}")
+    if not bilan.total:
+        print("Rien à effacer : adresse(s) inconnue(s) d'Auspex.")
+    elif not args.apply:
+        print("Simulation uniquement. Relancer avec --apply pour effacer.")
+    else:
+        print("Effacé.")
+    print("\nNon modifiés par cette commande (voir la page « Données traitées ») :\n"
+          "  - NetBox : le compte d'Auspex n'a aucun droit de suppression ; supprimer avec un compte\n"
+          f"    administrateur l'adresse IP {', '.join(bilan.netbox)} (IPAM → Adresses IP) si elle a été créée par Auspex ;\n"
+          "  - alertes déjà livrées (SIEM, webhook, fichier de sortie) : à effacer dans ces outils ;\n"
+          "  - exports d'audit signés et sauvegardes déjà produits (preuves scellées) ;\n"
+          "  - logs Zeek reçus, purgés automatiquement (AUSPEX_LOGS_RETENTION_DAYS, 30 jours par défaut).\n"
+          "Un équipement encore actif sur le réseau réapparaîtra au prochain cycle.")
+    return 0
 
 
 def cmd_assets(args) -> int:
@@ -476,34 +518,38 @@ def cmd_daemon(args) -> int:
             log(event="configuration_invalide", problems=exc.problems, note="configuration précédente conservée")
         status: dict = {"started": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                         "interval": args.interval}
-        try:
-            if args.apply:
-                from .deploy import reconcile_deployment
-                applied = reconcile_deployment(cfg)
-                if applied:
-                    status["apply"] = applied
-            if not logs.is_dir():
-                raise OSError(f"{logs} n'est pas un répertoire")
-            a = run_analysis(cfg, logs, None, send=True)
-            status["analyse"] = {"records": a["records"], "findings": sum(a["findings"].values()),
-                                 "events": a["events"], "delivery_errors": a["delivery_errors"]}
-            if cfg.netbox:
-                n = run_netbox_sync(cfg, None, apply=True, send=True)
-                status["netbox"] = {"created": len(n["plan"].creates), "updated": len(n["plan"].updates),
-                                    "findings": len(n["findings"]), "events": _count_events(n["events"]),
-                                    "delivery_errors": n["errors"]}
-            status["ok"] = True
-        except (DeploymentError, NetBoxError, ModuleError, RuleError, BackupError, OSError, ValueError) as exc:
-            status.update(ok=False, error=str(exc))
-        status["finished"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        cfg.state_dir.mkdir(parents=True, exist_ok=True)
-        _heartbeat_path(cfg).write_text(json.dumps(status, ensure_ascii=False, default=str), encoding="utf-8")
-        # Instantané du tableau de bord (widgets NetBox) : jamais bloquant.
-        try:
-            from .dashboard import write_snapshot
-            write_snapshot(cfg, normalizer=_rule_data(cfg)[2])
-        except Exception as exc:  # noqa: BLE001 - le tableau de bord ne doit pas arrêter le service
-            log(event="tableau_de_bord_erreur", error=str(exc))
+        # Verrou de l'état : une commande qui le modifie (auspex oublier) attend la fin
+        # du cycle, et inversement.
+        from .oubli import verrou_etat
+        with verrou_etat(cfg.state_dir, attente=float("inf")):
+            try:
+                if args.apply:
+                    from .deploy import reconcile_deployment
+                    applied = reconcile_deployment(cfg)
+                    if applied:
+                        status["apply"] = applied
+                if not logs.is_dir():
+                    raise OSError(f"{logs} n'est pas un répertoire")
+                a = run_analysis(cfg, logs, None, send=True)
+                status["analyse"] = {"records": a["records"], "findings": sum(a["findings"].values()),
+                                     "events": a["events"], "delivery_errors": a["delivery_errors"]}
+                if cfg.netbox:
+                    n = run_netbox_sync(cfg, None, apply=True, send=True)
+                    status["netbox"] = {"created": len(n["plan"].creates), "updated": len(n["plan"].updates),
+                                        "findings": len(n["findings"]), "events": _count_events(n["events"]),
+                                        "delivery_errors": n["errors"]}
+                status["ok"] = True
+            except (DeploymentError, NetBoxError, ModuleError, RuleError, BackupError, OSError, ValueError) as exc:
+                status.update(ok=False, error=str(exc))
+            status["finished"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            cfg.state_dir.mkdir(parents=True, exist_ok=True)
+            _heartbeat_path(cfg).write_text(json.dumps(status, ensure_ascii=False, default=str), encoding="utf-8")
+            # Instantané du tableau de bord (widgets NetBox) : jamais bloquant.
+            try:
+                from .dashboard import write_snapshot
+                write_snapshot(cfg, normalizer=_rule_data(cfg)[2])
+            except Exception as exc:  # noqa: BLE001 - le tableau de bord ne doit pas arrêter le service
+                log(event="tableau_de_bord_erreur", error=str(exc))
         # Exports d'audit périodiques (audit.referentiels) : jamais bloquants, et seulement
         # après un cycle réussi (sinon les preuves seraient périmées).
         if status.get("ok"):
@@ -835,6 +881,12 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--zone")
     a.add_argument("--json", action="store_true")
     a.set_defaults(func=cmd_assets)
+
+    ob = sub.add_parser("oublier", help="effacer un ou plusieurs actifs et leur historique (RGPD ; "
+                                        "simulation par défaut)")
+    ob.add_argument("ip", nargs="+", help="adresse(s) IP à effacer")
+    ob.add_argument("--apply", action="store_true", help="effacer (sinon : simulation)")
+    ob.set_defaults(func=cmd_forget)
 
     f = sub.add_parser("findings", help="écarts ouverts")
     f.add_argument("--min-severity", default="info", choices=SEVERITY_ORDER)

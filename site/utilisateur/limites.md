@@ -25,7 +25,7 @@ rapports d'audit soient lus pour ce qu'ils sont.
   quel protocole, depuis quand, et s'ils respectent les règles déclarées.
 
 Auspex ne lit que des **métadonnées** de trafic : il n'enregistre pas le
-contenu des échanges.
+contenu des échanges (voir [Données traitées](../documentation/07-donnees-traitees.md)).
 
 ## Ce qu'Auspex ne voit pas
 

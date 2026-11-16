@@ -71,6 +71,8 @@ DESCRIPTIONS = {
         "capteur.conf, chaque clé expliquée, sorties SIEM (syslog CEF/JSON, webhook).",
     "documentation/06-preuves-ci.md": "Ce que la CI d'Auspex prouve à chaque modification : vrai NetBox, "
         "vrai navigateur, appliance en machine virtuelle, captures industrielles réelles.",
+    "documentation/07-donnees-traitees.md": "Données traitées par Auspex (RGPD), pour le DPO : chaque "
+        "donnée collectée, sa finalité, sa durée de conservation, et l'effacement d'un actif sur demande.",
 }
 
 
@@ -108,6 +110,7 @@ TITLES = {
     "documentation/04-exploitation.md": "Exploitation : installation, mises à jour, sauvegardes",
     "documentation/05-configuration.md": "Référence de configuration",
     "documentation/06-preuves-ci.md": "Preuves automatisées : ce que la CI vérifie",
+    "documentation/07-donnees-traitees.md": "Données traitées par Auspex (RGPD)",
 }
 
 
