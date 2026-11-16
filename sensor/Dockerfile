@@ -26,13 +26,15 @@ RUN for p in modbus dnp3 bacnet opcua-binary omron-fins hart-ip ge-srtp profinet
     done; touch /opt/icsnpp-absents
 
 # Outils de construction retirés une fois les parsers compilés : moins de code
-# embarqué, donc moins de surface et de vulnérabilités signalées. GitPython
-# (python3-git, utilisé par zkg pour télécharger les parsers) est retiré s'il
-# n'emporte pas Zeek avec lui (simulation apt d'abord).
-RUN apt-get purge -y --auto-remove build-essential cmake git libpcap-dev >/dev/null \
- && if apt-get -s purge python3-git 2>/dev/null | grep -q '^Remv zeek'; then \
-        echo "python3-git conservé (requis par le paquet Zeek)"; \
-    else apt-get purge -y --auto-remove python3-git >/dev/null && echo "python3-git retiré"; fi \
+# embarqué, donc moins de surface et de vulnérabilités signalées. Chaque paquet
+# n'est retiré que si apt confirme, par simulation, qu'il n'emporte aucun
+# paquet Zeek avec lui (le paquet Zeek dépend de certains : ils restent).
+RUN for p in build-essential cmake libpcap-dev git python3-git; do \
+      if ! dpkg -s "$p" >/dev/null 2>&1; then continue; fi; \
+      if apt-get -s purge --auto-remove "$p" 2>&1 | grep -q '^Remv zeek'; then \
+        echo "$p conservé (requis par Zeek)"; \
+      else apt-get purge -y --auto-remove "$p" >/dev/null && echo "$p retiré"; fi; \
+    done \
  && rm -rf /var/lib/apt/lists/* /root/.cache \
  && zeek --version
 
