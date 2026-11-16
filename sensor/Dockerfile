@@ -29,7 +29,7 @@ RUN for p in modbus dnp3 bacnet opcua-binary omron-fins hart-ip ge-srtp profinet
 # relèvent de la FoxIO License 1.1, qui interdit l'usage monétisé sans licence OEM.
 # Aucune règle d'Auspex ne s'en servait ; à réévaluer avec une licence compatible.
 
-COPY auspex.zeek live.zeek entrypoint.sh /opt/auspex/
+COPY auspex.zeek live.zeek entrypoint.sh rejoindre.py /opt/auspex/
 RUN chmod 0755 /opt/auspex/entrypoint.sh
 
 LABEL org.opencontainers.image.title="auspex-sensor" \

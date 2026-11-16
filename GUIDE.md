@@ -481,8 +481,40 @@ En écoute continue, les logs tournent toutes les heures et sont purgés après
 48 h (`AUSPEX_SENSOR_RETENTION_HOURS`).
 
 **Envoi au central.** Le capteur pousse ses logs toutes les minutes (SSH +
-rsync, port 2222 du central) ; il n'ouvre aucun port. Inscription en trois
-étapes :
+rsync, port 2222 du central) ; il n'ouvre aucun port.
+
+**Raccordement par code** (le plus simple, capteur Docker) :
+
+```bash
+# 1. Sur le central : un code à usage unique, valable une heure
+docker compose exec auspex auspex capteur inviter capteur-ot --zone OT-N2 \
+    --adresse 10.9.0.20 --central auspex.ville.fr
+#   → 7K3Q-M9TD-2HXP-QF8L-ABCD-EFGH-JKMN
+
+# 2. Sur le capteur : raccordement, puis écoute (central et empreinte retenus)
+docker run --rm --network host -v /etc/auspex-capteur:/etc/auspex-capteur \
+  auspex-sensor rejoindre auspex.ville.fr 7K3Q-M9TD-2HXP-QF8L-ABCD-EFGH-JKMN
+docker run -d --name auspex-sensor --network host --cap-drop ALL \
+  --cap-add NET_RAW --cap-add NET_ADMIN \
+  -v /etc/auspex-capteur:/etc/auspex-capteur -v /var/lib/auspex/logs:/logs \
+  auspex-sensor live eth1
+```
+
+- Le code contient le début de l'empreinte du central : le capteur vérifie la
+  clé du central avant d'envoyer quoi que ce soit (un faux central est
+  refusé, sans confiance au premier contact).
+- Son secret (60 bits) donne au capteur une clé d'invitation que le central
+  autorise pour **une seule commande** (déposer la clé du capteur), une seule
+  fois, jusqu'à l'expiration, et depuis `--adresse` si elle est donnée. Le
+  central n'en garde que la clé publique.
+- Le capteur est enregistré au cycle suivant dans `data/state/capteurs.yaml`,
+  lu en plus des capteurs de `auspex.yaml` (que le service ne modifie
+  jamais). `auspex capteur retirer capteur-ot` le retire, ou annule une
+  invitation.
+- L'appliance ISO se raccorde encore par adresse et empreinte (menu de la
+  console), comme ci-dessous.
+
+**Raccordement manuel**, en trois étapes :
 
 ```bash
 # 1. Sur le capteur : sa clé d'envoi (créée au premier appel)
@@ -510,7 +542,8 @@ docker run -d --name auspex-sensor --network host --cap-drop ALL \
   ni redirection de port (seule lecture possible : la publication signée
   des mises à jour, en lecture seule) ; `allow` limite les adresses d'origine. Le service de
   réception tourne sans privilèges, système en lecture seule.
-- Retirer un capteur de `auspex.yaml` révoque sa clé au cycle suivant.
+- Retirer un capteur de `auspex.yaml` (ou `auspex capteur retirer` pour un
+  capteur raccordé par code) révoque sa clé au cycle suivant.
 - `auspex capteur liste` : capteurs autorisés et dernier dépôt reçu. Les logs
   reçus sont purgés après 30 jours (`AUSPEX_LOGS_RETENTION_DAYS`).
 - Limite connue : un capteur compromis peut déposer de faux logs dans son

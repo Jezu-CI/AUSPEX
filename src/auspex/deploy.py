@@ -120,11 +120,13 @@ def _netbox_section(cfg: Config) -> Section:
 def _reception_section(cfg: Config) -> Section:
     from .reception import (authorized_line, authorized_path, current_lines, fingerprint, render_authorized_keys,
                             write_authorized_keys)
+    from .invitation import charger
     sec = Section("Réception des capteurs")
+    invitations = charger(cfg.state_dir)
     wanted = {s.name: authorized_line(s) for s in cfg.sensors if s.key}
     keys = {s.name: s.key for s in cfg.sensors if s.key}
     path = authorized_path(cfg.state_dir)
-    if not wanted and not path.exists():
+    if not wanted and not invitations and not path.exists():
         sec.notes.append("aucun capteur avec clé d'envoi (sensors[].key)")
         return sec
     current = current_lines(cfg.state_dir)
@@ -133,14 +135,14 @@ def _reception_section(cfg: Config) -> Section:
                     if n in current and current[n] != line]
     sec.changes += [f"- {n}" for n in current if n not in wanted]
     if not sec.changes and (not path.exists() or
-                            path.read_text(encoding="utf-8") != render_authorized_keys(cfg.sensors)):
+                            path.read_text(encoding="utf-8") != render_authorized_keys(cfg.sensors, invitations)):
         sec.changes.append("~ fichier des clés autorisées")
     if not sec.changes:
         sec.notes.append(f"{len(wanted)} capteur(s) autorisé(s) à envoyer leurs logs")
 
     def run() -> str:
-        write_authorized_keys(cfg.state_dir, cfg.sensors)
-        return f"{len(wanted)} capteur(s) autorisé(s)"
+        write_authorized_keys(cfg.state_dir, cfg.sensors, invitations)
+        return f"{len(wanted)} capteur(s) autorisé(s)" + (f", {len(invitations)} invitation(s)" if invitations else "")
 
     if sec.changes:
         sec.action = run

@@ -21,8 +21,8 @@ RUN apt-get update \
  && usermod -p '*' capteur
 
 COPY deploy/reception/sshd_config /etc/auspex-reception-sshd/sshd_config
-COPY deploy/reception/auspex-recevoir deploy/reception/entrypoint.sh /usr/local/bin/
-RUN chmod 0755 /usr/local/bin/auspex-recevoir /usr/local/bin/entrypoint.sh
+COPY deploy/reception/auspex-recevoir deploy/reception/auspex-inscrire deploy/reception/entrypoint.sh /usr/local/bin/
+RUN chmod 0755 /usr/local/bin/auspex-recevoir /usr/local/bin/auspex-inscrire /usr/local/bin/entrypoint.sh
 
 LABEL org.opencontainers.image.title="auspex-reception" \
       org.opencontainers.image.description="Réception des logs des capteurs Auspex (SSH, rsync en écriture seule)" \

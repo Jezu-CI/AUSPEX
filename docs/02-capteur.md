@@ -56,6 +56,48 @@ empreinte`) avant tout envoi ; un faux central ne reçoit rien.
 `auspex capteur liste` : capteurs déclarés, autorisés, dernier dépôt, version
 d'analyse et résultat de la dernière mise à jour.
 
+### Raccordement par code d'invitation (`invitation.py`, `sensor/rejoindre.py`)
+
+```mermaid
+sequenceDiagram
+  participant A as Administrateur (central)
+  participant S as Capteur
+  participant R as Central — reception
+  participant C as Central — service Auspex
+  A->>C: auspex capteur inviter NOM --zone Z [--adresse IP]
+  C->>C: code = secret (60 bits) + début de l'empreinte de R (80 bits)
+  C->>R: authorized_keys : clé dérivée du secret,<br/>restrict, expiry-time, from=, command="auspex-inscrire NOM"
+  A-->>S: code (hors bande)
+  S->>R: ssh-keyscan : empreinte ≟ celle du code, sinon abandon
+  S->>R: ssh -i clé dérivée (scrypt → Ed25519), stdin = clé publique du capteur
+  R->>R: auspex-inscrire : dépôt unique (noclobber) de inscriptions/NOM.pub
+  C->>C: cycle suivant : invitation valable ? → state/capteurs.yaml,<br/>invitation consommée, vraie clé autorisée (auspex-recevoir NOM)
+```
+
+- **Code** : 28 caractères (alphabet de Crockford, saisie tolérante), dont
+  12 pour le secret et 16 pour les 80 premiers bits de l'empreinte SHA-256
+  de la clé d'hôte de la réception. Le capteur refuse un central dont la clé
+  ne correspond pas (pas de confiance au premier contact).
+- **Clé d'invitation** : graine Ed25519 = scrypt(secret, sel fixe, N=2^14,
+  r=8, p=1). Le central n'enregistre que la clé publique
+  (`state/invitations.json`) ; le capteur la recalcule en Python pur (RFC
+  8032), sans bibliothèque à installer. Testé : même clé que `cryptography`.
+- **Autorisation** : une seule commande (`auspex-inscrire NOM`, qui n'accepte
+  qu'une ligne `ssh-ed25519 …` et ne l'écrit qu'une fois), jusqu'à
+  `expiry-time` (1 h par défaut, `--minutes`), depuis `--adresse` si donnée ;
+  sshd limite les tentatives (3 par connexion). Nom, zone et interface sont
+  fixés par l'invitation, jamais par le capteur.
+- **Enregistrement** : `state/capteurs.yaml`, fusionné avec `sensors` de
+  `auspex.yaml` (que le service ne modifie jamais), sous le verrou de l'état.
+  `auspex capteur retirer NOM` retire le capteur ou annule l'invitation.
+- **Capteur** : l'adresse et l'empreinte complète du central sont retenues
+  dans `/etc/auspex-capteur/central.env`, lu par `live` et `envoyer`.
+- **Appliance ISO** : pas encore (pas de Python dans l'image) ; raccordement
+  par adresse et empreinte depuis la console.
+- Preuves CI (`tools/ci_capteur.py`, central complet et vrai capteur) : bon
+  code, code d'un autre central, mauvais secret, mauvaise adresse, code
+  rejoué, `auspex.yaml` intact, envoi sans réglage, retrait.
+
 ## Appliance (ISO)
 
 Construite par `appliance/build.sh` (live-build, Debian 12) à partir de
