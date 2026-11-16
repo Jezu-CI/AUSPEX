@@ -174,7 +174,7 @@ class SSOBrowser:
         status, url, page = self.open(f"{URL}/login/?next={PAGE}")
         for form in re.findall(r"<form[^>]*>.*?</form>", page, re.S):
             action = re.search(r'action="([^"]+)"', form)
-            if action and f"/oauth/login/{backend}/" in html.unescape(action.group(1)):
+            if action and re.search(rf"/oauth/(begin|login)/{backend}/", html.unescape(action.group(1))):
                 fields = {html.unescape(n): html.unescape(v) for n, v in
                           re.findall(r'<input[^>]*name="([^"]+)"[^>]*value="([^"]*)"', form)}
                 return self.open(urllib.parse.urljoin(URL + "/", html.unescape(action.group(1))), fields)
@@ -195,7 +195,7 @@ class SSOBrowser:
 def diagnose_sso(page: str) -> None:
     """Échec : messages affichés par NetBox (erreur de social-auth) et fin de son journal."""
     msgs = [re.sub(r"<[^>]+>|\s+", " ", m).strip() for m in
-            re.findall(r'class="[^"]*(?:toast-body|alert)[^"]*"[^>]*>(.*?)</div>', page, re.S)]
+            re.findall(r'class="(?![^"]*d-none)[^"]*(?:toast-body|alert)[^"]*"[^>]*>(.*?)</div>', page, re.S)]
     print("::notice title=Messages NetBox::" + " | ".join(m for m in msgs if m)[:2000], flush=True)
     r = run("docker", "compose", "logs", "--tail", "80", "netbox", check_rc=False)
     lines = [li for li in (r.stdout + r.stderr).splitlines()

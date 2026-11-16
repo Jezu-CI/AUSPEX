@@ -314,7 +314,7 @@ def sso_screens(browser) -> None:
                               extra_http_headers={"X-Forwarded-For": CLIENT})
     page = ctx.new_page()
     page.goto(f"{URL}/login/?next=/")          # NetBox 4.7 : la connexion unique commence par un POST
-    page.click("form[action*='/oauth/login/oidc/'] button")
+    page.click("form[action*='/oidc/'] button")
     page.wait_for_load_state("networkidle")
     shot(page, "sso-fournisseur", "Connexion unique", "Page du fournisseur d'identité",
          "Redirection vers le fournisseur (ici Keycloak) ; sa propre MFA s'applique.")
