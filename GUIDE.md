@@ -317,7 +317,12 @@ auth:
 - Secret du client dans `.env` : `AUSPEX_OIDC_CLIENT_SECRET=...`, donné à
   NetBox seul. Adresse de retour à déclarer chez le fournisseur :
   `https://<votre NetBox>/oauth/complete/oidc/`.
-- Le fournisseur est toujours joint en HTTPS, certificat vérifié.
+- Le fournisseur est toujours joint en HTTPS, certificat vérifié. Avec une
+  autorité interne (`ca_file`), la vérification est stricte (NetBox 4.7) : le
+  certificat de l'autorité doit porter les extensions `basicConstraints`
+  (CA) et `keyUsage` (signature de certificats), comme le font les autorités
+  d'entreprise (AD CS, etc.). Contrôle :
+  `openssl x509 -in ca-interne.pem -noout -ext basicConstraints,keyUsage`.
 - Hors du groupe exigé : refusé avant toute création de compte. Les groupes
   envoyés sont recopiés dans NetBox à chaque connexion ; administrateur
   NetBox seulement via `superuser_group`. Jamais de rattachement d'un compte

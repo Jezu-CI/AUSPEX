@@ -17,6 +17,7 @@ sont reprises telles quelles sur la page de chaque version GitHub.
   - jetons d'API v2 (`nbt_CLÉ.SECRET`) : NetBox n'en garde qu'une empreinte, calculée avec un nouveau secret de `.env` (`API_TOKEN_PEPPER`, ajouté par `update.sh`). L'API ne permet plus d'imposer la valeur d'un jeton : ceux de l'administrateur et de Librarian sont posés dans NetBox par le plugin (`manage.py auspex_jeton`, valeur lue sur l'entrée standard). L'image ne crée plus aucun jeton. Les jetons v1 d'une installation antérieure restent valables ;
   - contrôle des adresses autorisées (trusted hosts) : les jetons sont identifiés comme NetBox 4.7 les identifie (v2 et v1) ; un jeton inconnu est refusé par le plugin lui-même, sans attendre NetBox ;
   - connexion unique (OIDC, SAML) : elle ne démarre plus que par le bouton de la page de connexion (requête POST protégée contre la falsification) ; NetBox joint lui-même le fournisseur SAML, le complément que faisait le plugin est retiré ;
+  - autorité de certification interne (OIDC, serveur de messagerie) : vérification stricte des certificats (Python 3.14 de l'image) ; une autorité sans extensions `basicConstraints` et `keyUsage` est refusée (contrôle donné dans le guide) ;
   - codes MFA par e-mail : envoi direct en SMTP (bibliothèque standard), Django 6.1 n'acceptant plus de moteur d'envoi propre à un plugin ; certificat du serveur toujours vérifié, TLS 1.2 au moins.
 
   `./update.sh` fait passer une installation sur la version livrée précédente (4.4) à la 4.7, avec sauvegarde et retour arrière automatique comme toute mise à jour.

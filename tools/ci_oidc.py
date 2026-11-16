@@ -59,11 +59,18 @@ def make_certificates() -> None:
     certs = WORK / "certs"
     certs.mkdir(parents=True, exist_ok=True)
     o = lambda *a: run("openssl", *a)  # noqa: E731
+    # Autorité conforme à la vérification stricte de Python ≥ 3.13 (image NetBox 4.7) :
+    # usage de clé et contraintes de base obligatoires, identifiants de clé.
     o("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(WORK / "ca.key"), "-out",
-      str(WORK / "ca.crt"), "-days", "2", "-subj", "/CN=Autorite CI OIDC")
+      str(WORK / "ca.crt"), "-days", "2", "-subj", "/CN=Autorite CI OIDC",
+      "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign,cRLSign",
+      "-addext", "subjectKeyIdentifier=hash")
     o("req", "-newkey", "rsa:2048", "-nodes", "-keyout", str(certs / "kc.key"), "-out", str(WORK / "kc.csr"),
       "-subj", "/CN=sso.ville.test")
-    (WORK / "ext.cnf").write_text("subjectAltName=DNS:sso.ville.test\n")
+    (WORK / "ext.cnf").write_text("subjectAltName=DNS:sso.ville.test\nbasicConstraints=CA:FALSE\n"
+                                  "keyUsage=critical,digitalSignature,keyEncipherment\n"
+                                  "extendedKeyUsage=serverAuth\nauthorityKeyIdentifier=keyid\n"
+                                  "subjectKeyIdentifier=hash\n")
     o("x509", "-req", "-in", str(WORK / "kc.csr"), "-CA", str(WORK / "ca.crt"), "-CAkey", str(WORK / "ca.key"),
       "-CAcreateserial", "-out", str(certs / "kc.crt"), "-days", "2", "-extfile", str(WORK / "ext.cnf"))
     o("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(WORK / "autre.key"), "-out",
