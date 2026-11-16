@@ -60,7 +60,7 @@ class Command(BaseCommand):
                 if not creer:
                     raise CommandError(f"utilisateur inconnu : {username}")
                 user = User(username=username, first_name=username, last_name="(compte de service Auspex)",
-                            is_active=True, is_staff=False, is_superuser=False)
+                            is_active=True, is_superuser=False)
                 user.set_unusable_password()
                 user.save()
                 self.stdout.write(f"{username} : utilisateur créé (sans droit)")
