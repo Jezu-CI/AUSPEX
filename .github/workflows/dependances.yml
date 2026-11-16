@@ -131,3 +131,23 @@ jobs:
         with:
           sarif_file: trivy.sarif
           category: ${{ steps.analyse.outputs.categorie }}
+
+  releve:
+    name: Relevé des empreintes (temporaire)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Empreintes actuelles
+        run: |
+          for ref in nginxinc/nginx-unprivileged:1.31-alpine nginxinc/nginx-unprivileged:alpine \
+                     postgres:16-alpine postgres:17-alpine valkey/valkey:8-alpine valkey/valkey:9-alpine \
+                     python:3.12-slim python:3.13-slim debian:bookworm-slim debian:trixie-slim zeek/zeek:lts \
+                     netboxcommunity/netbox:v4.7 netboxcommunity/netbox:v4.6 netboxcommunity/netbox:latest; do
+            d=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['digest'])" 2>/dev/null)
+            echo "EMPREINTE $ref $d"
+          done
+          for ref in netboxcommunity/netbox:v4.7 zeek/zeek:lts; do
+            echo "ETIQUETTES $ref $(docker buildx imagetools inspect "$ref" --format '{{json .Image}}' 2>/dev/null | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin); d=d.get('linux/amd64',d) if isinstance(d,dict) and 'linux/amd64' in d else d
+          print(json.dumps((d.get('config') or {}).get('Labels') or {}))" 2>/dev/null)"
+          done
