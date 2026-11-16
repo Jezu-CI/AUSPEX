@@ -192,6 +192,17 @@ class SSOBrowser:
                                                           "credentialId": ""})
 
 
+def diagnose_sso(page: str) -> None:
+    """Échec : messages affichés par NetBox (erreur de social-auth) et fin de son journal."""
+    msgs = [re.sub(r"<[^>]+>|\s+", " ", m).strip() for m in
+            re.findall(r'class="[^"]*(?:toast-body|alert)[^"]*"[^>]*>(.*?)</div>', page, re.S)]
+    print("::notice title=Messages NetBox::" + " | ".join(m for m in msgs if m)[:2000], flush=True)
+    r = run("docker", "compose", "logs", "--tail", "80", "netbox", check_rc=False)
+    lines = [li for li in (r.stdout + r.stderr).splitlines()
+             if re.search(r"social|oauth|oidc|Error|Exception|auspex", li, re.I) and "/static/" not in li]
+    print("::notice title=Journal NetBox (SSO)::" + "%0A".join(li.replace("%", "%25") for li in lines[-40:])[:6000], flush=True)
+
+
 def ensure_group_can_view(name: str) -> None:
     """Droit de lecture du groupe du fournisseur : donné par ci_ldap.py dans la CI complète,
     absent quand ce script est lancé seul (captures d'écran). Sans lui, la page d'arrivée
@@ -274,9 +285,11 @@ def main() -> int:
 
     print("Connexions")
     b = SSOBrowser()
-    status, url, _ = b.sso_login("oidc1", pw1)
-    check(f"oidc1 (groupe exigé) : NetBox → Keycloak → NetBox → {path_of(url)} (attendu {PAGE}, sans MFA Auspex)",
-          status == 200 and url.startswith(URL) and path_of(url) == PAGE)
+    status, url, page = b.sso_login("oidc1", pw1)
+    ok = status == 200 and url.startswith(URL) and path_of(url) == PAGE
+    check(f"oidc1 (groupe exigé) : NetBox → Keycloak → NetBox → {path_of(url)} (attendu {PAGE}, sans MFA Auspex)", ok)
+    if not ok:
+        diagnose_sso(page)
     _, users = api("GET", "/api/users/users/?username=oidc1")
     u = users["results"][0] if users and users.get("count") else {}
     check("e-mail repris du fournisseur", u.get("email") == "oidc1@ville.test")
