@@ -70,7 +70,11 @@ mkdir -p tls config/tls data/state/tableau data/state/reception data/state/acces
 if [ "$(id -u)" -eq 0 ]; then
     chown -R "$(env_get AUSPEX_UID):$(env_get AUSPEX_GID)" data logs
 fi
-[ -f config/auspex.yaml ] || cp auspex.yaml.template config/auspex.yaml
+premiere_config=""
+if [ ! -f config/auspex.yaml ]; then
+    cp auspex.yaml.template config/auspex.yaml
+    premiere_config=1
+fi
 [ -f config/regles-flux.csv ] || cp regles-flux.template.csv config/regles-flux.csv
 
 # Certificat HTTPS du front, dans tls/ (hors de config/, que NetBox lit) :
@@ -98,6 +102,30 @@ fi
 
 say "Construction des images (Auspex, et NetBox avec le plugin Auspex)"
 docker compose build auspex netbox reception acces
+
+# Assistant de première configuration (zones, plages d'adresses, SIEM, audit) :
+# à la première installation, devant un terminal, ou avec un fichier de réponses
+# (AUSPEX_REPONSES=reponses.json). Sinon (CI, script) : configuration d'exemple.
+# AUSPEX_SANS_QUESTIONS=1 le désactive.
+if [ -n "$premiere_config" ] && [ -z "${AUSPEX_SANS_QUESTIONS:-}" ] \
+        && { [ -t 0 ] || [ -n "${AUSPEX_REPONSES:-}" ]; }; then
+    say "Configuration du premier site"
+    args=(--modele /tmp/auspex-modele.yaml)
+    vols=(-v "$PWD/auspex.yaml.template:/tmp/auspex-modele.yaml:ro")
+    if [ -n "${AUSPEX_REPONSES:-}" ]; then
+        vols+=(-v "$(cd "$(dirname "$AUSPEX_REPONSES")" && pwd)/$(basename "$AUSPEX_REPONSES"):/tmp/auspex-reponses.json:ro")
+        args+=(--reponses /tmp/auspex-reponses.json)
+    fi
+    genere=$(mktemp)
+    # Questions sur la sortie d'erreur, configuration sur la sortie standard.
+    if docker compose run --rm --no-deps -T "${vols[@]}" auspex init "${args[@]}" > "$genere"; then
+        cat "$genere" > config/auspex.yaml
+        echo "Configuration enregistrée dans config/auspex.yaml."
+    else
+        echo "Assistant interrompu : configuration d'exemple conservée (config/auspex.yaml)." >&2
+    fi
+    rm -f "$genere"
+fi
 
 say "Démarrage de NetBox (le premier démarrage peut prendre plusieurs minutes)"
 docker compose up -d postgres redis netbox
@@ -164,6 +192,8 @@ cat <<EOF
               docker compose exec auspex auspex capteur empreinte
   Logs      : reçus des capteurs (ou déposés à la main) dans $(pwd)/logs
   Config    : $(pwd)/config/auspex.yaml  (zones, sorties SIEM, règles de flux)
+  Règles    : $(pwd)/config/regles-flux.csv ; sans règle, tout flux entre zones est signalé :
+              c'est voulu, la liste des écarts montre ce qui circule et sert à écrire les règles
   Suivi     : docker compose logs -f auspex
   Écarts    : docker compose exec auspex auspex findings
   Audit     : les écritures d'Auspex apparaissent dans l'historique NetBox au nom de « Librarian »

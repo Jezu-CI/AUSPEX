@@ -3,7 +3,7 @@
 
   python tools/site.py [--build]
 
-Assemble build/site-src : pages du site (site/), guide (README), documentation
+Assemble build/site-src : pages du site (site/), guide (GUIDE.md), documentation
 technique (docs/), journal des versions, sécurité, composants tiers et galerie
 des captures d'écran (site/assets/captures/index.json). Les liens relatifs vers
 des fichiers du dépôt qui ne sont pas des pages du site deviennent des liens
@@ -28,7 +28,7 @@ GITHUB = "https://github.com/Jezu-CI/AUSPEX"
 
 # Fichier du dépôt → page du site
 PAGES = {
-    "README.md": "guide.md",
+    "GUIDE.md": "guide.md",
     "CHANGELOG.md": "versions.md",
     "SECURITY.md": "securite.md",
     "THIRD-PARTY.md": "composants-tiers.md",

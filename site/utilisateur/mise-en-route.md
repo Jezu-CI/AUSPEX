@@ -1,9 +1,9 @@
 ---
-title: Mettre Auspex en route
-description: "Mettre Auspex en route pas à pas : installer le central, décrire les zones, importer les flux autorisés, brancher un capteur et vérifier que tout fonctionne."
+title: Installer et mettre en route Auspex
+description: "Installer Auspex pas à pas : git clone, ./install.sh, un assistant demande vos zones, plages d'adresses et SIEM ; puis flux autorisés, capteur et vérification."
 ---
 
-# Mettre Auspex en route
+# Installer et mettre en route Auspex
 
 Compter une demi-journée pour un premier site, dont la plus grande partie à
 rassembler les informations (plages d'adresses, matrice de flux). La partie
@@ -35,8 +35,9 @@ cd auspex/deploy
 ```
 
 Le script fait tout seul le reste : il crée les mots de passe, prépare NetBox,
-crée un certificat HTTPS provisoire et démarre les services. À la fin, il
-affiche l'adresse de NetBox.
+crée un certificat HTTPS provisoire et démarre les services. Pendant
+l'installation, **un assistant vous pose quelques questions** (étape 2). À la
+fin, le script affiche l'adresse de NetBox.
 
 Le mot de passe du compte `admin` se trouve dans le fichier `deploy/.env`,
 sur la ligne `NETBOX_ADMIN_PASSWORD`. Ce fichier contient tous les secrets
@@ -49,30 +50,32 @@ de l'installation : ne le copiez nulle part.
     `auth`, ligne `break_glass` : `allow: [10.0.10.5/32]` (votre adresse),
     puis relancez NetBox avec `docker compose up -d --force-recreate netbox`.
 
-## Étape 2 : décrire vos zones
+## Étape 2 : répondre à l'assistant
 
-Ouvrez `deploy/config/auspex.yaml` avec un éditeur de texte. La rubrique
-`zones` contient des exemples à remplacer par vos vraies zones :
+L'assistant demande, dans l'ordre :
 
-```yaml
-zones:
-  - { name: T0-AD,         class: tier0,     prefixes: [10.0.0.0/24] }
-  - { name: T1-serveurs,   class: tier1,     prefixes: [10.1.0.0/16] }
-  - { name: T2-postes,     class: tier2,     prefixes: [10.2.0.0/16] }
-  - { name: ADMIN-bastion, class: admin,     prefixes: [10.9.0.0/24] }
-  - { name: OT-DMZ,        class: purdue3.5, prefixes: [172.16.35.0/24] }
-  - { name: OT-N2,         class: purdue2,   prefixes: [172.16.2.0/24] }
-```
+1. **le nom de l'organisation ou du site**, affiché en tête des rapports
+   d'audit ;
+2. **vos zones**, une par une : leur type dans une liste (Tier 0 annuaire,
+   serveurs, postes, administration, DMZ, niveaux industriels de Purdue…),
+   un nom court proposé d'office, et leurs **plages d'adresses**
+   (`10.0.0.0/24`, plusieurs séparées par des virgules) ;
+3. **votre SIEM**, s'il y en a un : son adresse, le transport (TLS conseillé)
+   et le format (CEF ou JSON) ;
+4. **les référentiels d'audit** pour lesquels produire un rapport signé chaque
+   mois (NIS2, DORA, IEC 62443, ISO 27001, ANSSI).
 
-- `name` : un nom court, sans espace, que vous retrouverez partout.
-- `class` : la sensibilité de la zone (voir [Les notions](notions.md#zone)).
-  Valeurs possibles : `tier0`, `tier1`, `tier2`, `admin`, `dmz`, `other`,
-  `purdue0` à `purdue5`, `purdue3.5`.
-- `prefixes` : une ou plusieurs plages d'adresses. Une adresse appartient à
-  la plage la plus précise qui la contient.
+Chaque réponse est vérifiée au fur et à mesure : une plage mal écrite ou deux
+zones qui se chevauchent sont signalées tout de suite. Un récapitulatif
+s'affiche avant d'enregistrer. Le résultat est écrit dans
+`deploy/config/auspex.yaml`, que vous pouvez modifier ensuite à tout moment
+(Auspex le relit à chaque cycle). Le sens de chaque type de zone est expliqué
+dans [Les notions](notions.md#zone).
 
-Profitez-en pour renseigner `organisation:` (le nom qui apparaîtra en tête
-des rapports d'audit).
+!!! tip "Pas toutes les réponses sous la main ?"
+    Répondez « n » à la première question : une configuration d'exemple est
+    installée, à adapter plus tard dans `deploy/config/auspex.yaml` (rubrique
+    `zones`, et `organisation:` pour le nom des rapports).
 
 ## Étape 3 : déclarer les flux autorisés
 

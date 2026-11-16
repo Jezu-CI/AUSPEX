@@ -273,6 +273,11 @@ def cmd_analyze(args) -> int:
     return 3 if errors else 0
 
 
+def cmd_init(args) -> int:
+    from .assistant import main as assistant
+    return assistant(args.modele, args.reponses)
+
+
 def cmd_forget(args) -> int:
     """Effacement d'actifs (RGPD) : simulation par défaut, --apply pour effacer."""
     from .oubli import OubliError, adresses, oublier, verrou_etat
@@ -847,6 +852,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("validate", help="vérifier auspex.yaml").set_defaults(func=cmd_validate)
+    ini = sub.add_parser("init", help="assistant de première configuration : questions, puis auspex.yaml "
+                                      "sur la sortie standard")
+    ini.add_argument("--modele", required=True, help="modèle de configuration (deploy/auspex.yaml.template)")
+    ini.add_argument("--reponses", help="réponses en JSON, sans questions (automatisation)")
+    ini.set_defaults(func=cmd_init)
     dm = sub.add_parser("daemon", help="service : analyse, synchronisation NetBox et alertes en continu")
     dm.add_argument("--logs", required=True, help="répertoire où arrivent les logs des capteurs")
     dm.add_argument("--interval", type=int, default=300, help="secondes entre deux cycles (défaut : 300)")

@@ -54,7 +54,7 @@ flowchart LR
 
 | Vous êtes… | Lisez d'abord |
 | --- | --- |
-| la personne qui installe Auspex | [Mettre Auspex en route](mise-en-route.md), puis [Installer un capteur](capteurs.md) |
+| la personne qui installe Auspex | [Installer et mettre en route](mise-en-route.md), puis [Installer un capteur](capteurs.md) |
 | responsable sécurité ou réseau | [Les notions à connaître](notions.md), [Le tableau de bord](tableau-de-bord.md), [Comprendre les écarts](ecarts.md) |
 | la personne qui tient l'inventaire | [L'inventaire dans NetBox](inventaire.md) |
 | la personne qui gère les règles de pare-feu | [Déclarer les flux autorisés](regles-de-flux.md) |
@@ -65,7 +65,7 @@ flowchart LR
 
 1. [Les notions à connaître](notions.md) : zones, tiers, flux, écarts… en clair.
 2. [Ce qu'Auspex voit, ce qu'il ne voit pas](limites.md) : les limites de l'écoute passive, à connaître avant de lire un inventaire ou un rapport.
-3. [Mettre Auspex en route](mise-en-route.md) : de l'installation au premier écart.
+3. [Installer et mettre en route](mise-en-route.md) : de l'installation (avec l'assistant) au premier écart.
 4. [Se connecter](connexion.md) : première connexion, double authentification, que faire en cas de blocage.
 5. [Le tableau de bord](tableau-de-bord.md) : lire la page d'accueil en 30 secondes.
 6. [Comprendre et traiter les écarts](ecarts.md) : chaque type d'écart, et quoi faire.
