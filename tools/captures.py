@@ -313,7 +313,8 @@ def sso_screens(browser) -> None:
     ctx = browser.new_context(viewport={"width": 1280, "height": 860}, locale="fr-FR", ignore_https_errors=True,
                               extra_http_headers={"X-Forwarded-For": CLIENT})
     page = ctx.new_page()
-    page.goto(f"{URL}/oauth/login/oidc/?next=/")
+    page.goto(f"{URL}/login/?next=/")          # NetBox 4.7 : la connexion unique commence par un POST
+    page.click("form[action*='/oidc/'] button")
     page.wait_for_load_state("networkidle")
     shot(page, "sso-fournisseur", "Connexion unique", "Page du fournisseur d'identité",
          "Redirection vers le fournisseur (ici Keycloak) ; sa propre MFA s'applique.")

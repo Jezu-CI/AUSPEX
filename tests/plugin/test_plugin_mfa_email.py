@@ -252,7 +252,56 @@ def test_switch_method_during_enrollment(clock):
 
 def test_smtp_backend_verifies_certificates():
     import ssl
-    from netbox_auspex.mfa import VerifiedSMTPBackend
-    ctx = VerifiedSMTPBackend(host="x").ssl_context
+    from netbox_auspex.mfa import contexte_tls
+    ctx = contexte_tls()
     assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
     assert ctx.minimum_version >= ssl.TLSVersion.TLSv1_2
+
+
+@pytest.mark.parametrize("security, classe", [("starttls", "SMTP"), ("tls", "SMTP_SSL"), ("none", "SMTP")])
+def test_direct_smtp_sending(monkeypatch, security, classe):
+    """Envoi réel (NetBox 4.7) : bibliothèque standard, certificat toujours vérifié,
+    mot de passe lu dans l'environnement, jamais dans auspex.yaml."""
+    import smtplib
+    import ssl
+    from types import SimpleNamespace
+
+    from netbox_auspex import mfa as plugin_mfa
+    calls = []
+
+    class Fake:
+        def __init__(self, host, port, timeout=None, context=None):
+            calls.append((type(self).__name__, host, port, timeout, context))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            calls.append(("quit",))
+
+        def starttls(self, context=None):
+            calls.append(("starttls", context))
+
+        def login(self, user, password):
+            calls.append(("login", user, password))
+
+        def send_message(self, msg):
+            calls.append(("send", msg))
+
+    monkeypatch.setattr(smtplib, "SMTP", type("SMTP", (Fake,), {}))
+    monkeypatch.setattr(smtplib, "SMTP_SSL", type("SMTP_SSL", (Fake,), {}))
+    monkeypatch.setitem(SETTINGS["netbox_auspex"], "email_backend", "smtp")
+    monkeypatch.setenv("AUSPEX_SMTP_PASSWORD", "mot-de-passe")
+    cfg = SimpleNamespace(server="smtp.ville.fr", port=587, security=security, username="auspex", ca_file=None,
+                          sender="Auspex <auspex@ville.fr>")
+    plugin_mfa._deliver(cfg, "agent@ville.fr", "Code Auspex", "Votre code : 12345678 (poste 10.0.0.1)")
+
+    assert calls[0][:4] == (classe, "smtp.ville.fr", 587, 10)
+    contexts = [c[-1] for c in calls if c[0] in ("SMTP_SSL", "starttls") and c[-1] is not None]
+    assert len(contexts) == (0 if security == "none" else 1)
+    assert all(c.verify_mode == ssl.CERT_REQUIRED and c.check_hostname for c in contexts)
+    assert ("login", "auspex", "mot-de-passe") in calls
+    msg = next(c[1] for c in calls if c[0] == "send")
+    assert msg["To"] == "agent@ville.fr" and msg["Message-ID"].endswith("@ville.fr>")
+    assert "12345678" in msg.get_content()
+    assert calls[-1] == ("quit",)

@@ -17,7 +17,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Django : tests du plugin NetBox (même version majeure que NetBox 4.4)
+# Django : tests du plugin NetBox (NetBox 4.7 embarque Django 6.1 ; sa compatibilité
+# réelle est vérifiée par la CI du central, sur l'image NetBox livrée)
 # zxing-cpp + numpy : relecture des QR codes générés par un vrai décodeur
 dev = ["pytest>=8", "django>=5.2,<5.3", "zxing-cpp>=2.2", "numpy", "ruff"]
 

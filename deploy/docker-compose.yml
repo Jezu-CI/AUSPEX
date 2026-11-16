@@ -47,7 +47,7 @@ services:
       args:
         # Vide : version livrée, figée par empreinte (voir netbox/Dockerfile)
         NETBOX_BASE: ${NETBOX_BASE:-netbox-livree}
-    image: auspex-netbox:${NETBOX_VERSION:-v4.4}
+    image: auspex-netbox:${NETBOX_VERSION:-v4.7}
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,8 +65,11 @@ services:
       SUPERUSER_EMAIL: ${NETBOX_ADMIN_EMAIL:-admin@example.invalid}
       SUPERUSER_PASSWORD: ${NETBOX_ADMIN_PASSWORD:?définir NETBOX_ADMIN_PASSWORD dans .env}
       SKIP_SUPERUSER: "false"
-      # Jeton imposé : sans lui, l'image crée un jeton administrateur connu publiquement.
-      SUPERUSER_API_TOKEN: ${NETBOX_ADMIN_TOKEN:?définir NETBOX_ADMIN_TOKEN dans .env}
+      # Jetons d'API : aucun créé par l'image (pas de jeton connu publiquement) ;
+      # ceux de l'administrateur et de Librarian, rangés dans .env, sont posés
+      # par install.sh et update.sh (manage.py auspex_jeton). NetBox n'en garde
+      # qu'une empreinte, calculée avec ce poivre (le perdre invalide les jetons).
+      API_TOKEN_PEPPER_1: ${API_TOKEN_PEPPER:?définir API_TOKEN_PEPPER dans .env}
       AUSPEX_INTERNAL_SUBNET: ${AUSPEX_INTERNAL_SUBNET:-172.31.250.0/24}
       # Mot de passe SMTP des codes MFA par e-mail (facultatif, dans .env)
       AUSPEX_SMTP_PASSWORD: ${AUSPEX_SMTP_PASSWORD:-}

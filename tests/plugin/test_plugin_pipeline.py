@@ -105,12 +105,6 @@ def test_saml_groups_from_assertion_attributes(tmp_path):
         pipeline.require_group(object(), {"username": "s2"}, {"idp_name": "idp", "attributes": {"groups": ["autre"]}})
 
 
-def test_saml_login_link_gets_idp_name():
-    from django.test import Client
-    r = Client().get("/oauth/login/saml/?next=/ipam/")
-    assert r.status_code == 302 and "idp=idp" in r["Location"] and "next=%2Fipam%2F" in r["Location"]
-
-
 
 def test_sso_refusal_page_without_details():
     from django.test import Client

@@ -43,8 +43,13 @@ def check(label: str, ok: bool) -> None:
         print(f"::error title=Trusted hosts::{label}", flush=True)
 
 
+def entete(token: str) -> str:
+    """En-tête d'authentification NetBox : v2 « nbt_… » en Bearer, v1 en Token."""
+    return f"Bearer {token}" if token.startswith("nbt_") else f"Token {token}"
+
+
 def call(token, method, path, body=None, xff=None):
-    headers = {"Authorization": f"Token {token}", "Accept": "application/json",
+    headers = {"Authorization": entete(token), "Accept": "application/json",
                "Content-Type": "application/json"}
     if xff:
         headers["X-Forwarded-For"] = xff
@@ -91,11 +96,13 @@ def session_login(user, password, xff):
 def main() -> int:
     print("Mise en place : user1 et ses deux adresses autorisées")
     password = secrets.token_urlsafe(24) + "Aa9"
-    user_key = secrets.token_hex(20)
     code, user = call(ADMIN, "POST", "/api/users/users/", {"username": "user1", "password": password})
     check("création de user1 par l'administrateur (depuis la machine du central)", code == 201)
-    code, _ = call(ADMIN, "POST", "/api/users/tokens/", {"user": user["id"], "key": user_key})
+    # NetBox 4.7 choisit la valeur du jeton : lue dans la réponse
+    code, tok = call(ADMIN, "POST", "/api/users/tokens/", {"user": user["id"]})
     check("création du jeton de user1", code == 201)
+    tok = json.loads(tok) if isinstance(tok, str) else tok
+    user_key = f"nbt_{tok['key']}.{tok['token']}" if tok.get("version") == 2 else tok["token"]
     # Droit de lecture des adresses IP : sans lui, NetBox refuserait de lui-même.
     code, _ = call(ADMIN, "POST", "/api/users/permissions/", {
         "name": "ci-user1-lecture", "object_types": ["ipam.ipaddress"], "actions": ["view"],
@@ -121,7 +128,8 @@ def main() -> int:
         ["docker", "compose", "exec", "-T", "-e", f"K={user_key}", "auspex", "python", "-c",
          "import os,urllib.request,urllib.error\n"
          "r=urllib.request.Request('http://netbox:8080/api/ipam/ip-addresses/?limit=1',headers={"
-         "'Authorization':'Token '+os.environ['K'],'X-Forwarded-For':'10.10.1.2'})\n"
+         "'Authorization':('Bearer ' if os.environ['K'].startswith('nbt_') else 'Token ')+os.environ['K'],"
+         "'X-Forwarded-For':'10.10.1.2'})\n"
          "try: print(urllib.request.urlopen(r,timeout=20).status)\n"
          "except urllib.error.HTTPError as e: print(e.code, e.read().decode())"],
         capture_output=True, text=True, timeout=60)

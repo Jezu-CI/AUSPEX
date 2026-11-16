@@ -2,8 +2,8 @@
 # Mise à jour du central Auspex, avec sauvegarde et retour arrière automatique.
 #
 #   ./update.sh                         reconstruit et redémarre (même versions)
-#   ./update.sh --netbox v4.4.5         change la version de NetBox
-#                                       (--netbox v4.4 : retour à la version livrée)
+#   ./update.sh --netbox v4.7.6         change la version de NetBox
+#                                       (--netbox v4.7 : retour à la version livrée)
 #   ./update.sh --auspex v0.2.0         passe Auspex à un tag du dépôt
 #
 # Déroulé : sauvegarde (base NetBox, état Auspex, .env) → changement de
@@ -33,6 +33,7 @@ for v in "$NETBOX_TARGET" "$AUSPEX_TARGET"; do
 done
 
 say()  { printf '\n\033[1m%s\033[0m\n' "$*"; }
+rand() { ( set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$1" ); }
 rand_hex() { ( set +o pipefail; LC_ALL=C tr -dc 'a-f0-9' </dev/urandom | head -c "$1" ); }
 # Lecture de .env sans le charger dans le shell (voir install.sh).
 env_get() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
@@ -46,8 +47,15 @@ CURRENT_NETBOX=$(env_get NETBOX_VERSION)
 if ! grep -q '^NETBOX_ADMIN_TOKEN=' .env && grep -q '^NETBOX_TOKEN=' .env; then
     sed -i 's/^NETBOX_TOKEN=/NETBOX_ADMIN_TOKEN=/' .env
 fi
-grep -q '^LIBRARIAN_TOKEN=' .env || echo "LIBRARIAN_TOKEN=$(rand_hex 40)" >> .env
+grep -q '^LIBRARIAN_TOKEN=' .env || echo "LIBRARIAN_TOKEN=nbt_$(rand 12).$(rand 40)" >> .env
 grep -q '^AUSPEX_PROXY_SECRET=' .env || echo "AUSPEX_PROXY_SECRET=$(rand_hex 64)" >> .env
+# NetBox 4.7 : poivre des jetons v2 (les jetons v1 déjà en place restent valables).
+grep -q '^API_TOKEN_PEPPER=' .env || echo "API_TOKEN_PEPPER=$(rand 64)" >> .env
+# Installation sur une version livrée antérieure (sans NETBOX_BASE) : elle
+# passe à la version livrée par ce code, sous son nom.
+if [ -z "$NETBOX_TARGET" ] && ! grep -q '^NETBOX_BASE=' .env && [ "$CURRENT_NETBOX" != "$(netbox_livree)" ]; then
+    NETBOX_TARGET=$(netbox_livree)
+fi
 
 # Mise en place avec le jeton ADMINISTRATEUR (nouveaux champs d'une nouvelle
 # version, compte Librarian) : Librarian n'a pas ces droits, et c'est voulu.
@@ -55,6 +63,13 @@ as_admin() {
     NETBOX_TOKEN="$(env_get NETBOX_ADMIN_TOKEN)" LIBRARIAN_TOKEN="$(env_get LIBRARIAN_TOKEN)" \
         docker compose run --rm --no-deps -T -e NETBOX_TOKEN -e LIBRARIAN_TOKEN auspex "$@"
 }
+# Jetons de l'administrateur et de Librarian posés dans NetBox (voir install.sh) :
+# sans effet s'ils y sont déjà, recréés s'ils manquent (base restaurée, etc.).
+pose_jeton() {
+    env_get "$2" | docker compose exec -T netbox /opt/netbox/venv/bin/python \
+        /opt/netbox/netbox/manage.py auspex_jeton "$1" "${@:3}"
+}
+pose_jetons() { pose_jeton admin NETBOX_ADMIN_TOKEN && pose_jeton Librarian LIBRARIAN_TOKEN --creer; }
 wait_netbox() {
     local deadline=$(( $(date +%s) + TIMEOUT ))
     while [ "$(date +%s)" -lt "$deadline" ]; do
@@ -158,7 +173,7 @@ rollback() {
     since=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
     docker compose build auspex netbox reception acces >/dev/null && docker compose up -d >/dev/null
     # La base restaurée peut ne pas encore contenir Librarian : mise en place.
-    wait_netbox && as_admin netbox setup --apply >/dev/null \
+    wait_netbox && pose_jetons >/dev/null && as_admin netbox setup --apply >/dev/null \
         || echo "ATTENTION : mise en place NetBox impossible après retour arrière." >&2
     if healthy "$since"; then
         say "Mise à jour annulée : la version précédente fonctionne à nouveau."
@@ -203,6 +218,7 @@ docker compose build auspex reception acces || rollback
 docker compose up -d --force-recreate auspex || rollback
 docker compose up -d || rollback
 wait_netbox || rollback
+pose_jetons || rollback
 as_admin netbox setup --apply || rollback
 
 # --- 4. Contrôles de santé ------------------------------------------------------

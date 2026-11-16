@@ -57,11 +57,20 @@ def test_scripts_never_load_env_into_shell():
 
 
 def test_netbox_default_token_is_never_created():
-    """Sans SUPERUSER_API_TOKEN, l'image NetBox crée un jeton admin public."""
+    """Aucun jeton créé par l'image NetBox (ni jeton connu publiquement) : ceux de
+    l'administrateur et de Librarian, aléatoires, sont posés par install.sh."""
     c = yaml.safe_load((DEPLOY / "docker-compose.yml").read_text())
-    assert c["services"]["netbox"]["environment"]["SUPERUSER_API_TOKEN"].startswith("${NETBOX_ADMIN_TOKEN:?")
+    env = c["services"]["netbox"]["environment"]
+    assert "SUPERUSER_API_TOKEN" not in env and "SUPERUSER_API_KEY" not in env
+    assert env["API_TOKEN_PEPPER_1"].startswith("${API_TOKEN_PEPPER:?")
     install = (DEPLOY / "install.sh").read_text()
-    assert "NETBOX_ADMIN_TOKEN=$(rand_hex 40)" in install
+    assert "API_TOKEN_PEPPER=$(rand 64)" in install
+    for var in ("NETBOX_ADMIN_TOKEN", "LIBRARIAN_TOKEN"):
+        assert f"{var}=nbt_$(rand 12).$(rand 40)" in install
+    for script in ("install.sh", "update.sh"):
+        text = (DEPLOY / script).read_text()
+        assert "manage.py auspex_jeton" in text
+        assert "LIBRARIAN_TOKEN --creer" in text and "admin NETBOX_ADMIN_TOKEN" in text
 
 
 def test_auspex_container_never_gets_admin_token():
@@ -88,8 +97,10 @@ def test_old_env_is_migrated(tmp_path):
         assert r.returncode == 0, r.stderr
     env = dict(l.split("=", 1) for l in (tmp_path / ".env").read_text().splitlines() if "=" in l)
     assert env["NETBOX_ADMIN_TOKEN"] == "b" * 40 and "NETBOX_TOKEN" not in env
-    assert re.fullmatch(r"[a-f0-9]{40}", env["LIBRARIAN_TOKEN"])
-    assert (tmp_path / ".env").read_text().count("LIBRARIAN_TOKEN=") == 1
+    assert re.fullmatch(r"nbt_[A-Za-z0-9]{12}\.[A-Za-z0-9]{40}", env["LIBRARIAN_TOKEN"])
+    assert re.fullmatch(r"[A-Za-z0-9]{64}", env["API_TOKEN_PEPPER"])   # NetBox 4.7 : 50 caractères au moins
+    for var in ("LIBRARIAN_TOKEN", "API_TOKEN_PEPPER"):
+        assert (tmp_path / ".env").read_text().count(var + "=") == 1
 
 
 def test_entrypoint_gates_analysis_on_apply():
@@ -130,8 +141,9 @@ def test_install_generates_private_env_and_valid_token(tmp_path):
     assert perms == "600" and umask == "0022"  # umask limité à .env
     env = dict(l.split("=", 1) for l in (tmp_path / ".env").read_text().splitlines()
                if l and not l.startswith("#"))
-    assert re.fullmatch(r"[a-f0-9]{40}", env["NETBOX_ADMIN_TOKEN"])
-    assert re.fullmatch(r"[a-f0-9]{40}", env["LIBRARIAN_TOKEN"])
+    assert re.fullmatch(r"nbt_[A-Za-z0-9]{12}\.[A-Za-z0-9]{40}", env["NETBOX_ADMIN_TOKEN"])
+    assert re.fullmatch(r"nbt_[A-Za-z0-9]{12}\.[A-Za-z0-9]{40}", env["LIBRARIAN_TOKEN"])
+    assert re.fullmatch(r"[A-Za-z0-9]{64}", env["API_TOKEN_PEPPER"])
     assert env["LIBRARIAN_TOKEN"] != env["NETBOX_ADMIN_TOKEN"]
     assert len(env["NETBOX_SECRET_KEY"]) == 60 and len(env["DB_PASSWORD"]) == 32
     assert env["AUSPEX_UID"] != "0"           # les services ne tournent jamais en root
@@ -143,9 +155,12 @@ def test_install_generates_private_env_and_valid_token(tmp_path):
     assert other["NETBOX_ADMIN_TOKEN"] != env["NETBOX_ADMIN_TOKEN"]
 
 
-def test_admin_password_never_on_command_line():
-    text = (DEPLOY / "install.sh").read_text()
-    assert '-e NB_PASSWORD="' not in text and "-e NB_PASSWORD auspex" in text
+def test_tokens_never_on_command_line():
+    """Les jetons passent par l'entrée standard ou l'environnement, jamais en argument."""
+    for script in ("install.sh", "update.sh"):
+        text = (DEPLOY / script).read_text()
+        assert 'env_get "$2" | docker compose exec -T netbox' in text
+        assert "auspex_jeton \"$1\" \"${@:3}\"" in text
 
 
 
@@ -171,30 +186,19 @@ def test_template_access_defaults_are_safe(tmp_path):
 
 
 
-def test_unit_forwarded_rewrite_is_removed(tmp_path):
-    """Régression CI : NGINX Unit remplaçait l'adresse source par X-Forwarded-For,
-    ce qui permettait d'usurper l'adresse d'un poste autorisé."""
-    import json
-    import subprocess
-    import sys
-    conf = {"listeners": {
-        "0.0.0.0:8080": {"pass": "routes/main",
-                         "forwarded": {"client_ip": "X-Forwarded-For", "source": ["172.16.0.0/12"]}},
-        "[::]:8080": {"pass": "routes/main",
-                      "client_ip": {"header": "X-Forwarded-For", "source": ["10.0.0.0/8"]}}},
-        "routes": {"main": [{"action": {"pass": "applications/netbox"}}]}}
-    p = tmp_path / "nginx-unit.json"
-    p.write_text(json.dumps(conf))
-    r = subprocess.run([sys.executable, str(DEPLOY / "netbox" / "unit_no_forwarded.py"), str(p)],
-                       capture_output=True, text=True)
-    assert r.returncode == 0, r.stderr
-    out = json.loads(p.read_text())
-    assert "forwarded" not in json.dumps(out).lower() and "client_ip" not in json.dumps(out)
-    assert out["routes"] == conf["routes"]  # le reste est intact
-    p.write_text(json.dumps({"autre": 1}))  # format inattendu : la construction doit échouer
-    assert subprocess.run([sys.executable, str(DEPLOY / "netbox" / "unit_no_forwarded.py"), str(p)],
-                          capture_output=True).returncode != 0
-    assert "unit_no_forwarded.py" in (DEPLOY / "netbox" / "Dockerfile").read_text()
+def test_granian_forwarded_rewrite_is_removed():
+    """Le point d'entrée Granian de l'image NetBox 4.7 remplace l'adresse source par
+    X-Forwarded-For pour toute machine des plages privées : usurpation de l'adresse
+    d'un poste autorisé. Le nôtre expose l'application telle quelle."""
+    import ast
+    tree = ast.parse((DEPLOY / "netbox" / "granian.py").read_text())
+    assert [(n.module, [a.name for a in n.names]) for n in tree.body] == [("netbox.wsgi", ["application"])]
+    docker = (DEPLOY / "netbox" / "Dockerfile").read_text()
+    # La construction échoue si l'image n'a plus la forme attendue, et vérifie le résultat.
+    for needle in ("COPY deploy/netbox/granian.py", "grep -q 'netbox.granian:application' /opt/netbox/launch-netbox.sh",
+                   "grep -q 'wrap_wsgi_with_proxy_headers' /opt/netbox/netbox/netbox/granian.py",
+                   "cp /opt/auspex-lib/granian.py /opt/netbox/netbox/netbox/granian.py"):
+        assert needle in docker
 
 
 
@@ -433,9 +437,9 @@ def test_netbox_shipped_version_consistent():
 
 
 @pytest.mark.parametrize("avant, cible, version, base", [
-    ("", "v4.4.5", "v4.4.5", "netboxcommunity/netbox:v4.4.5"),            # autre version : à son étiquette
-    ("NETBOX_BASE=netboxcommunity/netbox:v4.4.5\n", "v4.4", "v4.4", None),  # retour à la version livrée
-    ("NETBOX_BASE=netboxcommunity/netbox:v4.4.5\n", "v4.4.6", "v4.4.6", "netboxcommunity/netbox:v4.4.6"),
+    ("", "v4.7.6", "v4.7.6", "netboxcommunity/netbox:v4.7.6"),            # autre version : à son étiquette
+    ("NETBOX_BASE=netboxcommunity/netbox:v4.7.6\n", "v4.7", "v4.7", None),  # retour à la version livrée
+    ("NETBOX_BASE=netboxcommunity/netbox:v4.7.6\n", "v4.7.7", "v4.7.7", "netboxcommunity/netbox:v4.7.7"),
 ])
 def test_update_netbox_version_block(tmp_path, avant, cible, version, base):
     """Le bloc « Versions » d'update.sh s'exécute tel quel sur un .env réel."""
@@ -446,10 +450,32 @@ def test_update_netbox_version_block(tmp_path, avant, cible, version, base):
     bloc = bloc[:bloc.index("\nfi\n") + 4]
     (tmp_path / "netbox").mkdir()
     (tmp_path / "netbox" / "Dockerfile").write_text((DEPLOY / "netbox" / "Dockerfile").read_text())
-    (tmp_path / ".env").write_text("NETBOX_VERSION=v4.4.5\n" + avant + "DB_PASSWORD=x\n")
+    (tmp_path / ".env").write_text("NETBOX_VERSION=v4.7.6\n" + avant + "DB_PASSWORD=x\n")
     r = subprocess.run(["bash", "-euc", f"NETBOX_TARGET={cible}\n{fonctions}\n{bloc}"], cwd=tmp_path,
                        capture_output=True, text=True, timeout=30)
     assert r.returncode == 0, r.stderr
     env = dict(l.split("=", 1) for l in (tmp_path / ".env").read_text().splitlines())
     assert env["NETBOX_VERSION"] == version and env["DB_PASSWORD"] == "x"
     assert env.get("NETBOX_BASE") == base
+
+
+@pytest.mark.parametrize("env, cible", [
+    ("NETBOX_VERSION=v4.4\n", "v4.7"),                                          # ancienne version livrée
+    ("NETBOX_VERSION=v4.7\n", ""),                                              # déjà à jour
+    ("NETBOX_VERSION=v4.7.6\nNETBOX_BASE=netboxcommunity/netbox:v4.7.6\n", ""),  # choix de l'administrateur
+])
+def test_update_moves_old_delivered_netbox_forward(tmp_path, env, cible):
+    """Installation sur une ancienne version livrée : update.sh passe à la version livrée
+    par ce code (sinon l'image serait construite sur la nouvelle base sous l'ancien nom)."""
+    import subprocess
+    src = (DEPLOY / "update.sh").read_text()
+    fonctions = "\n".join(l for l in src.splitlines() if l.startswith(("env_get()", "netbox_livree()")))
+    bloc = src[src.index("# Installation sur une version livrée antérieure"):]
+    bloc = bloc[:bloc.index("\nfi\n") + 4]
+    (tmp_path / "netbox").mkdir()
+    (tmp_path / "netbox" / "Dockerfile").write_text((DEPLOY / "netbox" / "Dockerfile").read_text())
+    (tmp_path / ".env").write_text(env)
+    r = subprocess.run(["bash", "-euc", f'NETBOX_TARGET=""\n{fonctions}\nCURRENT_NETBOX=$(env_get NETBOX_VERSION)\n'
+                        f'{bloc}\nprintf %s "$NETBOX_TARGET"'], cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout == cible

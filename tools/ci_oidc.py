@@ -59,11 +59,18 @@ def make_certificates() -> None:
     certs = WORK / "certs"
     certs.mkdir(parents=True, exist_ok=True)
     o = lambda *a: run("openssl", *a)  # noqa: E731
+    # Autorité conforme à la vérification stricte de Python ≥ 3.13 (image NetBox 4.7) :
+    # usage de clé et contraintes de base obligatoires, identifiants de clé.
     o("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(WORK / "ca.key"), "-out",
-      str(WORK / "ca.crt"), "-days", "2", "-subj", "/CN=Autorite CI OIDC")
+      str(WORK / "ca.crt"), "-days", "2", "-subj", "/CN=Autorite CI OIDC",
+      "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign,cRLSign",
+      "-addext", "subjectKeyIdentifier=hash")
     o("req", "-newkey", "rsa:2048", "-nodes", "-keyout", str(certs / "kc.key"), "-out", str(WORK / "kc.csr"),
       "-subj", "/CN=sso.ville.test")
-    (WORK / "ext.cnf").write_text("subjectAltName=DNS:sso.ville.test\n")
+    (WORK / "ext.cnf").write_text("subjectAltName=DNS:sso.ville.test\nbasicConstraints=CA:FALSE\n"
+                                  "keyUsage=critical,digitalSignature,keyEncipherment\n"
+                                  "extendedKeyUsage=serverAuth\nauthorityKeyIdentifier=keyid\n"
+                                  "subjectKeyIdentifier=hash\n")
     o("x509", "-req", "-in", str(WORK / "kc.csr"), "-CA", str(WORK / "ca.crt"), "-CAkey", str(WORK / "ca.key"),
       "-CAcreateserial", "-out", str(certs / "kc.crt"), "-days", "2", "-extfile", str(WORK / "ext.cnf"))
     o("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(WORK / "autre.key"), "-out",
@@ -167,8 +174,21 @@ class SSOBrowser:
         except urllib.error.HTTPError as e:
             return e.code, e.geturl(), e.read().decode("utf-8", "replace")
 
+    def sso_begin(self, backend: str):
+        """Bouton « connexion unique » de la page de connexion NetBox : depuis
+        NetBox 4.7, la connexion ne commence que par un POST (jeton CSRF et
+        paramètres du formulaire, dont idp pour SAML)."""
+        status, url, page = self.open(f"{URL}/login/?next={PAGE}")
+        for form in re.findall(r"<form[^>]*>.*?</form>", page, re.S):
+            action = re.search(r'action="([^"]+)"', form)
+            if action and re.search(rf"/oauth/(begin|login)/{backend}/", html.unescape(action.group(1))):
+                fields = {html.unescape(n): html.unescape(v) for n, v in
+                          re.findall(r'<input[^>]*name="([^"]+)"[^>]*value="([^"]*)"', form)}
+                return self.open(urllib.parse.urljoin(URL + "/", html.unescape(action.group(1))), fields)
+        return status, url, page
+
     def sso_login(self, user, password):
-        status, url, page = self.open(f"{URL}/oauth/login/oidc/?next={PAGE}")
+        status, url, page = self.sso_begin("oidc")
         if not url.startswith(KC):
             return status, url, page
         form = re.search(r'<form[^>]*id="kc-form-login"[^>]*>', page) or re.search(r"<form[^>]*>", page)
@@ -177,6 +197,17 @@ class SSOBrowser:
             return 0, url, page
         return self.open(html.unescape(action.group(1)), {"username": user, "password": password,
                                                           "credentialId": ""})
+
+
+def diagnose_sso(page: str) -> None:
+    """Échec : messages affichés par NetBox (erreur de social-auth) et fin de son journal."""
+    msgs = [re.sub(r"<[^>]+>|\s+", " ", m).strip() for m in
+            re.findall(r'class="(?![^"]*d-none)[^"]*(?:toast-body|alert)[^"]*"[^>]*>(.*?)</div>', page, re.S)]
+    print("::notice title=Messages NetBox::" + " | ".join(m for m in msgs if m)[:2000], flush=True)
+    r = run("docker", "compose", "logs", "--tail", "80", "netbox", check_rc=False)
+    lines = [li for li in (r.stdout + r.stderr).splitlines()
+             if re.search(r"social|oauth|oidc|Error|Exception|auspex", li, re.I) and "/static/" not in li]
+    print("::notice title=Journal NetBox (SSO)::" + "%0A".join(li.replace("%", "%25") for li in lines[-40:])[:6000], flush=True)
 
 
 def ensure_group_can_view(name: str) -> None:
@@ -261,9 +292,11 @@ def main() -> int:
 
     print("Connexions")
     b = SSOBrowser()
-    status, url, _ = b.sso_login("oidc1", pw1)
-    check(f"oidc1 (groupe exigé) : NetBox → Keycloak → NetBox → {path_of(url)} (attendu {PAGE}, sans MFA Auspex)",
-          status == 200 and url.startswith(URL) and path_of(url) == PAGE)
+    status, url, page = b.sso_login("oidc1", pw1)
+    ok = status == 200 and url.startswith(URL) and path_of(url) == PAGE
+    check(f"oidc1 (groupe exigé) : NetBox → Keycloak → NetBox → {path_of(url)} (attendu {PAGE}, sans MFA Auspex)", ok)
+    if not ok:
+        diagnose_sso(page)
     _, users = api("GET", "/api/users/users/?username=oidc1")
     u = users["results"][0] if users and users.get("count") else {}
     check("e-mail repris du fournisseur", u.get("email") == "oidc1@ville.test")

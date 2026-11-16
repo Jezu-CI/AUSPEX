@@ -16,7 +16,7 @@ GitHub).
 | Scénario de démonstration | 7 jours de logs IT/OT simulés : les 4 écarts plantés sont trouvés, le trafic Active Directory normal ne déclenche rien ; règles d'identification livrées valides |
 | SBOM | inventaire logiciel (CycloneDX) publié |
 | Capteur (Zeek réel) | l'image construite lit une capture IT/OT réaliste (`tools/pcapgen.py`), réseau coupé, système en lecture seule ; les logs produits sont analysés |
-| NetBox réel | synchronisation contre un vrai NetBox 4.4 : champs, créations, écarts d'inventaire, jetons v1 et v2 |
+| NetBox réel | synchronisation contre un vrai NetBox 4.7 : champs, créations, écarts d'inventaire, jetons v1 et v2 |
 | Central | installation complète en docker compose, puis les preuves ci-dessous, puis mise à jour et retour arrière |
 | Appliance | ISO construite, démarrée en VM (QEMU, KVM si disponible), trafic rejoué, captures des deux interfaces, mises à jour signées |
 

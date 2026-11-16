@@ -355,13 +355,17 @@ def apply_librarian(client: NetBoxClient, plan: list[dict], token: str, ca_file:
                 client.request("POST", "/api/users/permissions/", body=body)
             else:
                 client.request("PATCH", f"/api/users/permissions/{item['id']}/", body=body)
-        elif item["kind"] == "token":
-            client.request("POST", "/api/users/tokens/", body={
-                "user": uid, "key": token, "write_enabled": True,
-                "description": "Auspex : compte de service Librarian"})
+        # « token » : rien à écrire par l'API. Depuis NetBox 4.7, l'API choisit
+        # elle-même la valeur d'un jeton ; celui de Librarian (valeur connue
+        # d'avance, dans .env) est posé dans le conteneur NetBox par
+        # « manage.py auspex_jeton Librarian --creer » (install.sh, update.sh).
+        # Il n'est utilisable qu'une fois les droits posés : vérifié ci-dessous.
     identity = _token_identity(client.url, token, ca_file)
     if identity != "restreint":
-        raise NetBoxError(f"après mise en place, le jeton de Librarian est « {identity} » au lieu de « restreint »")
+        raise NetBoxError(f"après mise en place, le jeton de Librarian est « {identity} » au lieu de « restreint »"
+                          + (" : jeton absent de NetBox ? le poser dans le conteneur NetBox avec "
+                             "« manage.py auspex_jeton Librarian --creer » (install.sh et update.sh le font)"
+                             if identity == "invalide" else ""))
 
 
 # --- Synchronisation des adresses observées ----------------------------------------

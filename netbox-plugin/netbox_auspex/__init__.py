@@ -26,8 +26,8 @@ class AuspexConfig(PluginConfig):
     version = "0.2.0"
     author = "Yann Mathon"
     base_url = "auspex"
-    min_version = "4.4.0"
-    max_version = "4.4.99"
+    min_version = "4.7.0"
+    max_version = "4.7.99"
     default_auto_field = "django.db.models.BigAutoField"
     # Ordre : l'adresse source d'abord (refus immédiat), puis la MFA.
     middleware = ["netbox_auspex.middleware.TrustedHostsMiddleware",
@@ -35,7 +35,7 @@ class AuspexConfig(PluginConfig):
     default_settings = {
         "config_path": "/etc/auspex/auspex.yaml",
         "internal_subnet": None,
-        "email_backend": "netbox_auspex.mfa.VerifiedSMTPBackend",
+        "email_backend": "smtp",   # envoi direct (mfa._deliver) ; autre valeur : moteur Django (tests)
         # Instantané du tableau de bord écrit par le service Auspex (lecture seule)
         "dashboard_path": "/var/lib/auspex-tableau/dashboard.json",
         # Adresse du port carte du front (auth.carte) : bouton de la page de connexion

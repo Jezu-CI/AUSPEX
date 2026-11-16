@@ -50,7 +50,8 @@ def check(label: str, ok: bool) -> None:
 
 def api(method, path, body=None):
     req = urllib.request.Request(URL + path, method=method, data=json.dumps(body).encode() if body else None,
-                                 headers={"Authorization": f"Token {ADMIN}", "Accept": "application/json",
+                                 headers={"Authorization": ("Bearer " if ADMIN.startswith("nbt_") else "Token ") + ADMIN,
+                                          "Accept": "application/json",
                                           "Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=20) as r:

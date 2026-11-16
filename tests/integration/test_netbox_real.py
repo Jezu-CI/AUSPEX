@@ -9,7 +9,6 @@ Librarian, dont les interdictions sont vérifiées une à une.
 import importlib.util
 import json
 import os
-import secrets
 import shutil
 from pathlib import Path
 
@@ -20,7 +19,6 @@ from auspex.cli import main
 from auspex.netbox import LIBRARIAN, OBSERVED_DESCRIPTION, NetBoxClient, NetBoxError
 
 URL = os.environ.get("AUSPEX_NETBOX_URL")
-LIB_TOKEN = secrets.token_hex(20)
 pytestmark = pytest.mark.skipif(not URL, reason="AUSPEX_NETBOX_URL non défini (NetBox réel)")
 DEMO = Path(__file__).resolve().parents[2] / "examples" / "demo"
 
@@ -28,6 +26,24 @@ DEMO = Path(__file__).resolve().parents[2] / "examples" / "demo"
 @pytest.fixture(scope="module")
 def client():
     return NetBoxClient(URL, os.environ["NETBOX_TOKEN"])
+
+
+def jeton_complet(d: dict) -> str:
+    """Valeur à présenter à NetBox (4.7 : v2 « nbt_CLÉ.SECRET », v1 : le secret seul)."""
+    return f"nbt_{d['key']}.{d['token']}" if d.get("version") == 2 else d["token"]
+
+
+@pytest.fixture(scope="module")
+def lib_token(client):
+    """Compte Librarian et son jeton, posés comme le fait « manage.py auspex_jeton
+    Librarian --creer » dans le central (ici par l'API : image NetBox sans plugin).
+    Depuis NetBox 4.7, la valeur d'un jeton est choisie par NetBox."""
+    import secrets
+    found = client.list("/api/users/users/", {"username": LIBRARIAN})
+    uid = found[0]["id"] if found else post(client, "/api/users/users/", {
+        "username": LIBRARIAN, "password": secrets.token_urlsafe(48), "is_active": True})["id"]
+    return jeton_complet(post(client, "/api/users/tokens/", {
+        "user": uid, "write_enabled": True, "description": "Auspex : compte de service Librarian"}))
 
 
 @pytest.fixture(scope="module")
@@ -86,11 +102,11 @@ def declare(client):
         "assigned_object_type": "virtualization.vminterface", "assigned_object_id": vitf["id"]})
 
 
-def test_sync_against_real_netbox(client, site, capsys, monkeypatch):
+def test_sync_against_real_netbox(client, site, lib_token, capsys, monkeypatch):
     work, cfg = site
     major, minor = client.version()
     print(f"NetBox {major}.{minor}")
-    monkeypatch.setenv("LIBRARIAN_TOKEN", LIB_TOKEN)
+    monkeypatch.setenv("LIBRARIAN_TOKEN", lib_token)
     rc = main(["-c", cfg, "netbox", "setup", "--apply"])
     assert rc == 0, capsys.readouterr()
     assert "droits restreints vérifiés" in capsys.readouterr().out
@@ -98,7 +114,7 @@ def test_sync_against_real_netbox(client, site, capsys, monkeypatch):
     assert "Rien à faire" in capsys.readouterr().out
     declare(client)
 
-    monkeypatch.setenv("NETBOX_TOKEN", LIB_TOKEN)  # à partir d'ici : Librarian uniquement
+    monkeypatch.setenv("NETBOX_TOKEN", lib_token)  # à partir d'ici : Librarian uniquement
     assert main(["-c", cfg, "netbox", "sync", "--apply", "--now", "logs", "--no-send"]) == 0
     ips = {o["address"].split("/")[0]: o for o in client.list("/api/ipam/ip-addresses/")}
 
@@ -137,9 +153,9 @@ def forbidden(call) -> bool:
     return False
 
 
-def test_librarian_least_privilege(client, site):
+def test_librarian_least_privilege(client, site, lib_token):
     """Chaque interdiction de Librarian est vérifiée sur le vrai NetBox."""
-    lib = NetBoxClient(URL, LIB_TOKEN)
+    lib = NetBoxClient(URL, lib_token)
     ip_id = next(o["id"] for o in client.list("/api/ipam/ip-addresses/")
                  if o["address"].startswith("10.2.1.11/"))
     dc = next(d for d in client.list("/api/dcim/devices/") if d["name"] == "DC01")
@@ -152,13 +168,14 @@ def test_librarian_least_privilege(client, site):
         "name": "pirate", "type": "text", "object_types": ["ipam.ipaddress"]}))
     assert forbidden(lambda: lib.request("GET", "/api/users/users/"))
     # NetBox laisse chaque utilisateur lister SES jetons : Librarian ne doit
-    # voir que les siens, sans leur clé, et ne rien pouvoir faire pour autrui.
+    # voir que les siens, sans leur secret, et ne rien pouvoir faire pour autrui.
     librarian_id = client.list("/api/users/users/", {"username": LIBRARIAN})[0]["id"]
     admin_id = client.list("/api/users/users/", {"username": "admin"})[0]["id"]
     own = lib.list("/api/users/tokens/")
     assert own and all(t["user"]["id"] == librarian_id for t in own), "Librarian voit des jetons d'autrui"
-    assert all(t.get("key") in (None, "") or "*" in str(t.get("key")) for t in own), "clé de jeton exposée"
-    assert all(client.token not in json.dumps(t) for t in own)
+    secrets_ = [tok.rsplit(".", 1)[-1] for tok in (lib_token, client.token)]
+    assert all(not t.get("token") and not any(x in json.dumps(t) for x in secrets_) for t in own), \
+        "secret de jeton exposé"
     assert forbidden(lambda: lib.request("POST", "/api/users/tokens/", body={"user": admin_id}))
     # Interdit : créer une adresse qui ne porte pas la marque d'Auspex
     assert forbidden(lambda: lib.request("POST", "/api/ipam/ip-addresses/", body={

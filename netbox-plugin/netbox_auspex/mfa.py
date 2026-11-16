@@ -28,8 +28,6 @@ from datetime import datetime, timezone as dt_timezone
 from django.conf import settings
 from django.contrib.auth import BACKEND_SESSION_KEY, logout
 from django.core.cache import cache
-from django.core.mail import EmailMessage, get_connection
-from django.core.mail.backends.smtp import EmailBackend
 from django.db import transaction
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
@@ -128,13 +126,9 @@ class MFARequiredMiddleware:
         return any(path.startswith(p) for p in prefixes)
 
     def __call__(self, request):
-        # SAML : le bouton de NetBox mène à /oauth/login/saml/ sans le nom du
-        # fournisseur, que social-auth exige (?idp=...). On le complète.
-        if request.path.rstrip("/").endswith("/oauth/login/saml") and "idp" not in request.GET:
-            from auspex.netbox_auth import SAML_IDP_NAME
-            query = request.GET.copy()
-            query["idp"] = SAML_IDP_NAME
-            return HttpResponseRedirect(f"{request.path}?{query.urlencode()}")
+        # SAML : NetBox 4.7 joint lui-même le nom du fournisseur (idp) au
+        # formulaire de connexion (la connexion unique ne commence plus que par
+        # un POST) : plus rien à compléter ici.
         user = getattr(request, "user", None)
         if (user is not None and user.is_authenticated
                 and request.session.get(BACKEND_SESSION_KEY) in LOCAL_BACKENDS
@@ -196,17 +190,12 @@ def available_methods(user, access=None) -> list[str]:
 
 # --- Envoi des codes par e-mail -----------------------------------------------------------
 
-class VerifiedSMTPBackend(EmailBackend):
-    """SMTP avec vérification du certificat du serveur, toujours (autorité
+def contexte_tls(ca_file: str | None = None) -> ssl.SSLContext:
+    """TLS avec vérification du certificat du serveur, toujours (autorité
     interne possible : auth.mfa.email.ca_file)."""
-
-    ca_file = None
-
-    @property
-    def ssl_context(self):
-        ctx = ssl.create_default_context(cafile=self.ca_file)
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        return ctx
+    ctx = ssl.create_default_context(cafile=ca_file)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
 
 
 def _hmac_key() -> bytes:
@@ -230,16 +219,33 @@ def _client_ip(request) -> str:
 
 
 def _deliver(mail, to: str, subject: str, body: str) -> None:
+    """Envoi direct en SMTP (bibliothèque standard), indépendant du système de
+    messagerie de Django : NetBox 4.7 (Django 6.1) n'accepte plus de moteur
+    d'envoi choisi par un plugin. Un autre moteur Django désigné dans la
+    configuration du plugin (tests : locmem) reste utilisable."""
     backend = get_plugin_config("netbox_auspex", "email_backend")
-    kwargs = {}
-    if backend.endswith("VerifiedSMTPBackend"):
-        kwargs = dict(host=mail.server, port=mail.port, username=mail.username or "",
-                      password=os.environ.get("AUSPEX_SMTP_PASSWORD", ""),
-                      use_tls=mail.security == "starttls", use_ssl=mail.security == "tls", timeout=10)
-    connection = get_connection(backend, **kwargs)
-    if isinstance(connection, VerifiedSMTPBackend):
-        connection.ca_file = mail.ca_file
-    EmailMessage(subject, body, mail.sender, [to], connection=connection).send()
+    if backend != "smtp":
+        from django.core.mail import EmailMessage, get_connection
+        EmailMessage(subject, body, mail.sender, [to], connection=get_connection(backend)).send()
+        return
+    import smtplib
+    from email.message import EmailMessage as Message
+    from email.utils import formatdate, make_msgid, parseaddr
+    msg = Message()
+    msg["Subject"], msg["From"], msg["To"] = subject, mail.sender, to
+    domaine = parseaddr(mail.sender)[1].rpartition("@")[2]
+    msg["Date"], msg["Message-ID"] = formatdate(localtime=True), make_msgid(domain=domaine or None)
+    msg.set_content(body)
+    if mail.security == "tls":
+        smtp = smtplib.SMTP_SSL(mail.server, mail.port, timeout=10, context=contexte_tls(mail.ca_file))
+    else:
+        smtp = smtplib.SMTP(mail.server, mail.port, timeout=10)
+    with smtp:
+        if mail.security == "starttls":
+            smtp.starttls(context=contexte_tls(mail.ca_file))
+        if mail.username:
+            smtp.login(mail.username, os.environ.get("AUSPEX_SMTP_PASSWORD", ""))
+        smtp.send_message(msg)
 
 
 def send_code(request, access) -> str | None:

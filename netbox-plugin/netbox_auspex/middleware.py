@@ -76,18 +76,39 @@ class _Unidentified(Exception):
     pass
 
 
+class _UnknownToken(Exception):
+    pass
+
+
 def _token_user(header: str):
-    parts = header.split(None, 1)
-    if len(parts) != 2 or parts[0].lower() not in ("token", "bearer"):
+    """Utilisateur du jeton présenté, retrouvé comme le fait NetBox 4.7
+    (netbox/api/authentication.py) : « nbt_CLÉ.SECRET » → jeton v2 (clé, puis
+    empreinte du secret) ; sinon jeton v1 (valeur en clair), quel que soit le
+    mot-clé (Token ou Bearer)."""
+    parts = header.split()
+    if not parts or parts[0].lower() not in ("token", "bearer"):
         return None
-    key = parts[1].strip()
+    if len(parts) != 2:
+        raise _UnknownToken("en-tête d'authentification mal formé")
+    value = parts[1]
     try:
         from users.models import Token
-        token = Token.objects.select_related("user").filter(key=key).first()
+        qs = Token.objects.select_related("user")
+        if value.startswith("nbt_"):
+            key, sep, secret = value[4:].partition(".")
+            token = qs.filter(version=2, key=key).first() if sep else None
+            if token is not None and not token.validate(secret):
+                token = None
+        else:
+            token = qs.filter(version=1, plaintext=value).first()
     except Exception as exc:
         raise _Unidentified(str(exc)) from exc
-    # Jeton inconnu : NetBox le refusera lui-même, rien à décider ici.
-    return token.user if token is not None else None
+    # Jeton inconnu : refusé ici aussi. Si la recherche de NetBox venait un jour
+    # à différer de la nôtre, un jeton qu'il accepterait ne passerait pas sans
+    # contrôle de l'adresse (refus par défaut).
+    if token is None:
+        raise _UnknownToken("jeton inconnu")
+    return token.user
 
 
 class TrustedHostsMiddleware:
@@ -104,6 +125,11 @@ class TrustedHostsMiddleware:
             if header:
                 try:
                     user = _token_user(header)
+                except _UnknownToken as exc:
+                    logger.warning(json.dumps({"event": "auspex_access_denied", "reason": str(exc),
+                                               "remote_addr": request.META.get("REMOTE_ADDR"),
+                                               "path": request.path}, ensure_ascii=False))
+                    return self._deny(request, str(exc), api=True)
                 except _Unidentified as exc:
                     logger.error(json.dumps({"event": "auspex_access_denied", "reason":
                                              f"identification du jeton impossible : {exc}"}, ensure_ascii=False))
