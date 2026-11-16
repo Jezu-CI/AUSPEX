@@ -40,7 +40,7 @@ au moins un préfixe ; une adresse appartient au préfixe le plus spécifique.
 
 ### `flow_rules`
 
-`file` : fichier `.csv` ou `.xlsx` ([format](../README.md#format-des-règles-de-flux)).
+`file` : fichier `.csv` ou `.xlsx` ([format](../GUIDE.md#format-des-règles-de-flux)).
 
 ### `alerts`
 

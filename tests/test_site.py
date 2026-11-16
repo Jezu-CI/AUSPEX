@@ -40,12 +40,15 @@ def test_every_nav_page_is_assembled():
 def test_links_rewritten():
     site = _site()
     out = site.rewrite("[a](docs/02-capteur.md#x) [b](deploy/install.sh) [c](https://e.org) [d](#y)",
-                       "README.md", "guide.md")
+                       "GUIDE.md", "guide.md")
     assert "(documentation/02-capteur.md#x)" in out
     assert "(https://github.com/Jezu-CI/AUSPEX/blob/main/deploy/install.sh)" in out
     assert "(https://e.org)" in out and "(#y)" in out
-    back = site.rewrite("[r](../README.md)", "docs/02-capteur.md", "documentation/02-capteur.md")
+    back = site.rewrite("[r](../GUIDE.md)", "docs/02-capteur.md", "documentation/02-capteur.md")
     assert "(../guide.md)" in back
+    # Le README, vitrine du dépôt, n'est pas une page du site : lien vers GitHub.
+    readme = site.rewrite("[r](../README.md)", "docs/02-capteur.md", "documentation/02-capteur.md")
+    assert "(https://github.com/Jezu-CI/AUSPEX/blob/main/README.md)" in readme
 
 
 def test_gallery_images_exist():

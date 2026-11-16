@@ -35,6 +35,7 @@ compte de service, sans émettre un seul paquet sur les réseaux surveillés.
 </div>
 
 [Télécharger](telecharger.md){ .md-button .md-button--primary }
+[Installer](utilisateur/mise-en-route.md){ .md-button }
 [Code source](https://github.com/Jezu-CI/AUSPEX){ .md-button }
 
 <small>Open source, licence AGPL v3 · conçu par Yann Mathon · [English summary](en/index.md){ hreflang=en lang=en }</small>

@@ -14,6 +14,8 @@ sont reprises telles quelles sur la page de chaque version GitHub.
 
 ### Ajouté
 
+- **Assistant d'installation** : à la première installation, `./install.sh` demande le nom de l'organisation, les zones et leurs plages d'adresses, le SIEM éventuel (syslog TLS, TCP ou UDP, CEF ou JSON) et les référentiels d'audit, vérifie chaque saisie (plage invalide, zones qui se chevauchent) et écrit `config/auspex.yaml` en gardant les commentaires du modèle. Aucune question hors d'un terminal (CI, script) ; `AUSPEX_REPONSES=reponses.json` pour une installation automatisée. Commande sous-jacente : `auspex init`.
+- **README recentré** (présentation, installation en trois lignes, démonstration, documentation) ; le détail du déploiement, de la sécurité des accès, du capteur, des commandes et des formats passe dans `GUIDE.md`, publié sur le site comme avant (page Guide, mêmes ancres). Page « Installer et mettre en route » du guide utilisateur mise à jour, bouton « Installer » sur l'accueil du site.
 - **Ce qu'Auspex voit, ce qu'il ne voit pas** : page du guide utilisateur, section du README, question de la FAQ et page anglaise. Limites de l'écoute passive (équipement silencieux, flux hors des liens écoutés, zone sans capteur, contenu chiffré, NAT, vulnérabilités non comparées, détection sans blocage) et parade pour chacune ; les exports d'audit aident à démontrer la conformité sur le périmètre écouté, sans la garantir.
 - Composants tiers : section « Site, visuels et interface » (thème du site, icônes Material Design et Font Awesome avec leur licence et l'attribution due, aucune police tierce, logos de l'auteur).
 - Feuille de route v0.3 : accessibilité, avec un état des lieux des contrastes (WCAG AA) dans [#35](https://github.com/Jezu-CI/AUSPEX/issues/35).

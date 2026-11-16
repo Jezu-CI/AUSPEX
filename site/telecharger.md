@@ -21,6 +21,10 @@ cd auspex/deploy
 ./install.sh
 ```
 
+Un assistant demande ensuite vos zones, leurs plages d'adresses et votre
+SIEM, et écrit la configuration. Pas à pas :
+[Installer et mettre en route](utilisateur/mise-en-route.md).
+
 Suite : [Déployer le central](guide.md#déployer-le-central) ·
 [Exploitation](documentation/04-exploitation.md).
 
