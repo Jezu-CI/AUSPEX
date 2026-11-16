@@ -4,13 +4,16 @@
 #   read FICHIER.pcap [...]   analyse des captures (logs dans /logs/<nom>/)
 #   live INTERFACE            écoute continue d'une interface (SPAN ou TAP),
 #                             avec envoi au central si AUSPEX_CENTRAL est défini
+#   rejoindre HOTE[:PORT] CODE  raccordement au central par le code d'invitation
+#                             (« auspex capteur inviter » sur le central)
 #   cle                       clé d'envoi du capteur (créée au besoin), à déclarer
 #                             dans auspex.yaml du central (sensors[].key)
 #   envoyer                   envoie une fois les logs de /logs au central
 #   version                   versions de Zeek et des paquets installés
 #
 # Envoi : AUSPEX_CENTRAL=hôte[:port] (2222 par défaut) et
-# AUSPEX_CENTRAL_EMPREINTE=SHA256:… (« auspex capteur empreinte » sur le central).
+# AUSPEX_CENTRAL_EMPREINTE=SHA256:… (« auspex capteur empreinte » sur le central),
+# ou retenus par « rejoindre » dans /etc/auspex-capteur/central.env.
 set -eu
 
 DIR=/opt/auspex
@@ -18,6 +21,13 @@ CONF=/etc/auspex-capteur
 KEY="$CONF/cle"
 RETENTION_HOURS="${AUSPEX_SENSOR_RETENTION_HOURS:-48}"
 INTERVAL="${AUSPEX_ENVOI_SECONDES:-60}"
+
+# Central retenu par « rejoindre » : utilisé si l'environnement ne le précise pas.
+if [ -z "${AUSPEX_CENTRAL:-}" ] && [ -f "$CONF/central.env" ]; then
+    AUSPEX_CENTRAL=$(sed -n 's/^AUSPEX_CENTRAL=//p' "$CONF/central.env")
+    AUSPEX_CENTRAL_EMPREINTE=$(sed -n 's/^AUSPEX_CENTRAL_EMPREINTE=//p' "$CONF/central.env")
+    export AUSPEX_CENTRAL AUSPEX_CENTRAL_EMPREINTE
+fi
 
 log() { printf '{"time":"%s","event":"%s"%s}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "${2:+,$2}" >&2; }
 
@@ -70,7 +80,7 @@ ship() {
 }
 
 usage() {
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 case "${1:-help}" in
@@ -101,6 +111,11 @@ case "${1:-help}" in
         fi
         cd /logs
         exec zeek -C -i "$iface" "$DIR/live.zeek"
+        ;;
+    rejoindre)
+        [ "$#" -eq 3 ] || { echo "Usage : rejoindre HOTE[:PORT] CODE" >&2; exit 2; }
+        ensure_key
+        exec python3 "$DIR/rejoindre.py" "$2" "$3" --cle "$KEY.pub" --conf "$CONF"
         ;;
     cle)
         ensure_key

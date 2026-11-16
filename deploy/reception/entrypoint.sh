@@ -10,6 +10,7 @@ if [ ! -f "$KEY" ]; then
     ssh-keygen -q -t ed25519 -N '' -C auspex-reception -f "$KEY"
 fi
 chmod 600 "$KEY"
+mkdir -p "$D/inscriptions"   # clés des capteurs raccordés par code (auspex-inscrire)
 echo "auspex-reception : clé d'hôte $(ssh-keygen -l -f "$KEY.pub" | cut -d' ' -f2)" >&2
 [ -f /etc/auspex-reception/authorized_keys ] \
     || echo "auspex-reception : aucun capteur autorisé pour l'instant (sensors[].key dans auspex.yaml)" >&2

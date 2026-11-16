@@ -1,0 +1,29 @@
+#!/bin/sh
+# Commande imposée à la clé d'invitation d'un capteur (auspex capteur inviter) :
+# lit la clé publique du capteur sur l'entrée (une ligne) et la dépose, une seule
+# fois, pour le service Auspex qui l'enregistre au cycle suivant. Rien d'autre :
+# ni shell, ni lecture, ni écriture ailleurs que dans le dossier des inscriptions.
+set -eu
+name="${1:-}"
+case "$name" in
+    ''|-*|*[!a-z0-9-]*) echo "auspex : capteur invalide" >&2; exit 1 ;;
+esac
+D=/var/lib/reception/inscriptions
+mkdir -p "$D"
+# Une ligne de 1 Ko au plus, de la forme « ssh-ed25519 BASE64 [commentaire] ».
+key=$(head -c 1024 | head -n 1 | tr -d '\r')
+case "$key" in
+    "ssh-ed25519 "*) ;;
+    *) echo "auspex : clé Ed25519 attendue" >&2; exit 1 ;;
+esac
+b64=$(printf '%s' "$key" | cut -d' ' -f2)
+case "$b64" in
+    ''|*[!A-Za-z0-9+/=]*) echo "auspex : clé illisible" >&2; exit 1 ;;
+esac
+# Création exclusive : un code déjà utilisé est refusé (noclobber).
+set -C
+if ! ( printf 'ssh-ed25519 %s\n' "$b64" > "$D/$name.pub" ) 2>/dev/null; then
+    echo "auspex : ce code a déjà servi" >&2
+    exit 1
+fi
+echo "auspex : inscription reçue pour « $name », enregistrée par le central au prochain cycle"

@@ -5,7 +5,9 @@ Vrai capteur (image auspex-sensor) : clé générée sur le capteur, déclarée 
 auspex.yaml du central, empreinte du central vérifiée par le capteur, logs
 Zeek envoyés par SSH + rsync et analysés par le central. Puis les attaques :
 faux central, clé inconnue, bonne clé depuis une mauvaise adresse, lecture,
-évasion du dossier, commande arbitraire, suppression, révocation.
+évasion du dossier, commande arbitraire, suppression, révocation. Enfin le
+raccordement par code d'invitation, avec ses refus (faux central, mauvais
+secret, mauvaise adresse, code rejoué) et le retrait.
 
 Usage (dans deploy/, après l'installation du central, image capteur construite
 sous le nom auspex-sensor:ci) : python ../tools/ci_capteur.py
@@ -198,6 +200,45 @@ def main() -> int:
     check("capteur retiré de auspex.yaml : clé retirée par le service", wait_authorized(False))
     r = sensor("envoyer", env=env)
     check("capteur révoqué : envoi refusé", r.returncode != 0)
+
+    print("Raccordement par code (auspex capteur inviter, rejoindre)")
+    r = run(*A, "capteur", "inviter", "capteur-code", "--zone", "OT-N2", "--adresse", SENSOR_IP,
+            "--central", "reception:2222")
+    code = (re.search(r"\b[0-9A-Z]{4}(?:-[0-9A-Z]{4}){6}\b", r.stdout) or [""])[0]
+    check(f"invitation créée, code affiché ({code[:4]}-…)", r.returncode == 0 and code)
+    keys = (STATE / "reception" / "authorized_keys").read_text()
+    check("clé d'invitation autorisée tout de suite, une seule commande, avec expiration",
+          "auspex-invitation:capteur-code" in keys and 'expiry-time="' in keys and "auspex-inscrire capteur-code" in keys)
+    check("le code lui-même n'est pas conservé sur le central",
+          code and code not in (STATE / "invitations.json").read_text())
+    groupes = code.split("-")
+    faux = "-".join(groupes[:3] + ["Z" * 4 if groupes[3] != "ZZZZ" else "Y" * 4] + groupes[4:])
+    r = sensor("rejoindre", "reception:2222", faux, conf="code-faux")
+    check("code d'un autre central (empreinte différente) : refusé avant tout envoi",
+          r.returncode != 0 and "faux central" in r.stderr)
+    mauvais = "-".join(["0000"] + groupes[1:])
+    r = sensor("rejoindre", "reception:2222", mauvais, conf="code-mauvais")
+    check("mauvais secret : refusé par le central", r.returncode != 0 and "refusé le code" in r.stderr)
+    r = sensor("rejoindre", "reception:2222", code, conf="code", ip=OTHER_IP)
+    check(f"bon code depuis une autre adresse ({OTHER_IP}) : refusé", r.returncode != 0)
+    r = sensor("rejoindre", "reception:2222", code.lower(), conf="code")
+    check("bon code (saisi en minuscules) : central vérifié, inscription envoyée",
+          r.returncode == 0 and (WORK / "code" / "central.env").exists())
+    r = sensor("rejoindre", "reception:2222", code, conf="code-rejeu")
+    check("code rejoué par un autre capteur : refusé", r.returncode != 0)
+    check("capteur enregistré par le service au cycle suivant, sa clé autorisée",
+          wait_authorized(True, name="capteur-code", tries=60))
+    check("auspex.yaml non modifié ; capteur rangé dans state/capteurs.yaml",
+          "capteur-code" not in CONFIG.read_text() and "capteur-code" in (STATE / "capteurs.yaml").read_text())
+    check("invitation consommée", "auspex-invitation:capteur-code" not in (STATE / "reception" / "authorized_keys").read_text())
+    r = sensor("envoyer", conf="code")
+    check("envoi sans réglage (central et empreinte retenus par « rejoindre »)",
+          r.returncode == 0 and (LOGS / "capteur-code" / "lab" / "conn.log").exists())
+    r = run(*A, "capteur", "retirer", "capteur-code")
+    check("auspex capteur retirer : clé retirée par le service",
+          r.returncode == 0 and wait_authorized(False, name="capteur-code", tries=60))
+    r = sensor("envoyer", conf="code")
+    check("capteur retiré : envoi refusé", r.returncode != 0)
 
     failed = [label for label, ok in RESULTS if not ok]
     print(f"\n{len(RESULTS) - len(failed)}/{len(RESULTS)} vérifications réussies")

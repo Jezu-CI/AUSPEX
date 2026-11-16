@@ -527,6 +527,14 @@ def cmd_daemon(args) -> int:
         # du cycle, et inversement.
         from .oubli import verrou_etat
         with verrou_etat(cfg.state_dir, attente=float("inf")):
+            # Capteurs raccordés par code depuis le cycle précédent (auspex capteur inviter).
+            from .invitation import traiter_inscriptions
+            for nom, resultat in traiter_inscriptions(cfg.state_dir, cfg.state_dir.parent / "reception" / "inscriptions"):
+                log(event="capteur_inscription", capteur=nom, resultat=resultat)
+                try:
+                    cfg = load_config(args.config)
+                except ConfigError as exc:
+                    log(event="configuration_invalide", problems=exc.problems)
             try:
                 if args.apply:
                     from .deploy import reconcile_deployment
@@ -674,14 +682,73 @@ def cmd_sensor_fingerprint(args) -> int:
     return 0
 
 
+def cmd_sensor_invite(args) -> int:
+    from datetime import timedelta
+
+    from .invitation import InvitationError, charger, inviter
+    from .oubli import verrou_etat
+    from .reception import host_key_fingerprint, write_authorized_keys
+    cfg = _load(args)
+    if not 5 <= args.minutes <= 1440:
+        _err("--minutes : entre 5 et 1440 (24 h)")
+        return 1
+    fp = host_key_fingerprint(cfg.state_dir.parent / "reception")
+    if not fp:
+        _err("clé d'hôte de la réception introuvable : le service « reception » a-t-il démarré ?")
+        return 1
+    try:
+        with verrou_etat(cfg.state_dir):
+            code = inviter(cfg, fp, args.nom, args.zone, args.interface, args.adresse or [],
+                           duree=timedelta(minutes=args.minutes))
+            write_authorized_keys(cfg.state_dir, cfg.sensors, charger(cfg.state_dir))
+    except InvitationError as exc:
+        _err(str(exc))
+        return 1
+    central = args.central or "ADRESSE-DU-CENTRAL"
+    print(f"""Invitation du capteur « {args.nom} » (zone {args.zone}, interface {args.interface}),
+valable {args.minutes} minutes, une seule fois :
+
+    {code}
+
+Sur le capteur (image Docker) :
+
+    docker run --rm -v /etc/auspex-capteur:/etc/auspex-capteur --network host auspex-sensor \\
+        rejoindre {central} {code}
+
+puis démarrer l'écoute (« live ») : l'adresse et l'empreinte du central sont retenues.
+Le capteur est enregistré au cycle suivant du service (5 minutes au plus).
+Ce code ne sera plus affiché : le central n'en garde que la clé publique dérivée.""")
+    return 0
+
+
+def cmd_sensor_remove(args) -> int:
+    from .invitation import retirer
+    from .oubli import verrou_etat
+    cfg = _load(args)
+    with verrou_etat(cfg.state_dir):
+        if retirer(cfg.state_dir, args.nom):
+            print(f"Capteur « {args.nom} » retiré (ou son invitation annulée) : il ne peut plus rien envoyer "
+                  "à partir du cycle suivant.")
+            return 0
+    if any(s.name == args.nom for s in cfg.sensors):
+        _err(f"« {args.nom} » est déclaré dans auspex.yaml : le retirer de la rubrique sensors.")
+    else:
+        _err(f"aucun capteur ni invitation « {args.nom} ».")
+    return 1
+
+
 def cmd_sensor_list(args) -> int:
     from . import maj
     from .reception import current_lines, fingerprint, sensor_activity
     cfg = _load(args)
     logs = _logs_dir(cfg, args.logs)
     active = current_lines(cfg.state_dir)
+    from .invitation import charger
+    for inv in charger(cfg.state_dir):
+        print(f"{inv.nom:<20} invitation en attente (zone {inv.zone}), expire à "
+              f"{inv.expire.strftime('%H:%M')} UTC")
     if not cfg.sensors:
-        print("aucun capteur déclaré (sensors dans auspex.yaml)")
+        print("aucun capteur déclaré (sensors dans auspex.yaml, ou auspex capteur inviter)")
         return 0
     for s in cfg.sensors:
         if not s.key:
@@ -935,6 +1002,17 @@ def build_parser() -> argparse.ArgumentParser:
                                                                                      required=True)
     cp.add_parser("empreinte", help="empreinte du central, à saisir sur chaque capteur").set_defaults(
         func=cmd_sensor_fingerprint)
+    ci = cp.add_parser("inviter", help="raccorder un capteur par un code à usage unique")
+    ci.add_argument("nom", help="nom du capteur (minuscules, chiffres, tirets)")
+    ci.add_argument("--zone", required=True, help="zone écoutée par le capteur")
+    ci.add_argument("--interface", default="eth1", help="interface d'écoute du capteur (défaut : eth1)")
+    ci.add_argument("--adresse", action="append", help="adresse d'où le capteur se connecte (recommandé, répétable)")
+    ci.add_argument("--central", help="adresse du central telle que le capteur la joint (pour la commande affichée)")
+    ci.add_argument("--minutes", type=int, default=60, help="validité du code (défaut : 60)")
+    ci.set_defaults(func=cmd_sensor_invite)
+    cr = cp.add_parser("retirer", help="retirer un capteur raccordé par code, ou annuler son invitation")
+    cr.add_argument("nom")
+    cr.set_defaults(func=cmd_sensor_remove)
     cl = cp.add_parser("liste", help="capteurs déclarés, autorisés, dernier dépôt reçu")
     cl.add_argument("--logs", help="répertoire des logs reçus (défaut : AUSPEX_LOGS ou à côté de l'état)")
     cl.set_defaults(func=cmd_sensor_list)

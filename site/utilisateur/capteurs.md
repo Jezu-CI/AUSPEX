@@ -129,6 +129,26 @@ configurer, afficher la clé d'envoi, l'exporter sur clé USB, redémarrer,
 Supprimez-le de la rubrique `sensors` : sa clé est révoquée au cycle suivant
 et il ne peut plus rien envoyer.
 
-!!! info "Une alternative : le capteur en conteneur"
-    Sur un serveur Linux déjà relié à un port miroir, le capteur existe aussi
-    en image Docker. Voir la [documentation technique](../documentation/02-capteur.md).
+Un capteur raccordé par code (voir ci-dessous) se retire avec
+`docker compose exec auspex auspex capteur retirer capteur-atelier`.
+
+## Variante : capteur en conteneur, raccordé par un code
+
+Sur un serveur Linux déjà relié à un port miroir, le capteur existe aussi en
+image Docker. Il se raccorde alors **par un code**, sans clé à recopier ni
+empreinte à relever :
+
+1. Sur le central, créez une invitation :
+   ```bash
+   docker compose exec auspex auspex capteur inviter capteur-atelier --zone OT-N2 --central auspex.ville.fr
+   ```
+   Un code s'affiche, par exemple `7K3Q-M9TD-2HXP-QF8L-ABCD-EFGH-JKMN`. Il ne
+   sert qu'une fois et expire au bout d'une heure.
+2. Sur le serveur du capteur, lancez la commande affichée par le central
+   (`… rejoindre auspex.ville.fr 7K3Q-…`). Le capteur vérifie d'abord qu'il
+   parle au bon central (le code contient de quoi le reconnaître), puis
+   s'inscrit.
+3. Démarrez l'écoute. Le central enregistre le capteur dans les 5 minutes, et
+   les données arrivent.
+
+Détails et options : [Guide, rubrique Capteur](../guide.md#capteur).

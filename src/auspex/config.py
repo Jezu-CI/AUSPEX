@@ -991,4 +991,12 @@ def load_config(path: str | Path) -> Config:
         raise ConfigError([f"{path} : fichier introuvable"]) from None
     except yaml.YAMLError as exc:
         raise ConfigError([f"{path} : YAML invalide ({exc})"]) from exc
-    return parse_config(raw, base_dir=path.parent)
+    cfg = parse_config(raw, base_dir=path.parent)
+    # Capteurs raccordés par code (state/capteurs.yaml, écrit par Auspex) : ajoutés à ceux
+    # d'auspex.yaml, que le service ne modifie jamais.
+    from .invitation import capteurs_raccordes
+    extra = capteurs_raccordes(cfg.state_dir)
+    if extra and isinstance(raw, dict):
+        raw = {**raw, "sensors": list(raw.get("sensors") or []) + extra}
+        cfg = parse_config(raw, base_dir=path.parent)
+    return cfg

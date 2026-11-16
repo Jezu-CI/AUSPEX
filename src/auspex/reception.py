@@ -89,9 +89,11 @@ def authorized_line(sensor) -> str:
     return f"{','.join(opts)} {sensor.key} auspex:{sensor.name}"
 
 
-def render_authorized_keys(sensors) -> str:
+def render_authorized_keys(sensors, invitations=()) -> str:
     lines = ["# Généré par Auspex à partir de auspex.yaml (sensors[].key) : ne pas modifier à la main."]
     lines += [authorized_line(s) for s in sensors if s.key]
+    # Invitations en cours (auspex capteur inviter) : une seule commande, jusqu'à l'expiration.
+    lines += [i.ligne() for i in invitations]
     return "\n".join(lines) + "\n"
 
 
@@ -99,10 +101,10 @@ def authorized_path(state_dir: Path) -> Path:
     return Path(state_dir) / "reception" / AUTHORIZED
 
 
-def write_authorized_keys(state_dir: Path, sensors) -> bool:
+def write_authorized_keys(state_dir: Path, sensors, invitations=()) -> bool:
     """Écrit le fichier s'il a changé ; renvoie True en cas de changement."""
     path = authorized_path(state_dir)
-    content = render_authorized_keys(sensors)
+    content = render_authorized_keys(sensors, invitations)
     if path.exists() and path.read_text(encoding="utf-8") == content:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
