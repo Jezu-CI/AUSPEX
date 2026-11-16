@@ -412,7 +412,7 @@ def cmd_netbox_setup(args) -> int:
     lib_plan = librarian_plan(client, lib_token, cfg.netbox.ca_file) if lib_token else []
     print(f"NetBox {major}.{minor} : {len(plan) + len(lib_plan)} élément(s) à créer ou corriger")
     labels = {"custom-field": "champ", "tag": "étiquette", "user": "utilisateur", "user-fix": "utilisateur",
-              "permission": "permission", "permission-fix": "permission", "token": "jeton"}
+              "permission": "permission", "permission-fix": "permission", "token": "jeton (vérifié)"}
     for item in plan + lib_plan:
         verb = "~" if item["kind"].endswith("-fix") else "+"
         print(f"  {verb} {labels[item['kind']]:<11} {item['name']}")

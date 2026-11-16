@@ -78,11 +78,13 @@ dans l'historique de NetBox au nom de Librarian. Une permission élargie à la
 main, ou un Librarian promu administrateur, est remis en ordre à la mise à
 jour suivante. La CI vérifie chaque interdiction sur un vrai NetBox.
 
-Les jetons sont générés aléatoirement à l'installation : le jeton
-administrateur par défaut de l'image NetBox, connu publiquement, n'est jamais
-créé (la CI vérifie qu'il est refusé).
+Les jetons sont générés aléatoirement à l'installation (jetons NetBox v2,
+dont NetBox ne garde qu'une empreinte, calculée avec le secret
+`API_TOKEN_PEPPER` de `.env`) : aucun jeton n'est créé par l'image NetBox, et
+le jeton administrateur par défaut connu publiquement est refusé (vérifié par
+la CI). Une installation antérieure garde ses jetons, toujours acceptés.
 
-**Mise à jour** — `./update.sh` (ou `./update.sh --netbox v4.4.5`,
+**Mise à jour** — `./update.sh` (ou `./update.sh --netbox v4.7.6`,
 `./update.sh --auspex v0.2.0`) sauvegarde la base NetBox, l'état d'Auspex et
 `.env`, change les versions, redémarre, puis contrôle la santé du central. Si
 un contrôle échoue, tout est remis comme avant, base NetBox comprise. La CI
@@ -650,7 +652,7 @@ auspex netbox sync --apply       # écriture et alertes
   | Fiche incomplète | propriétaire, niveau de protection, fonction métier ou criticité manquants (NIS2 §12.4, DORA art. 8) |
 
 - Fonctionne avec les équipements et les machines virtuelles, et avec les
-  jetons NetBox v1 et v2. Testé à chaque modification contre un vrai NetBox 4.4.
+  jetons NetBox v1 et v2. Testé à chaque modification contre un vrai NetBox 4.7.
 
 ## État voulu : `auspex plan` et `auspex apply`
 

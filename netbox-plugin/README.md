@@ -15,4 +15,4 @@ Fonctions :
 Les deux logiques sont testées sans NetBox ; le plugin les applique. Ses
 propres tests (`tests/plugin/`) tournent sur un vrai Django.
 
-Compatibilité : NetBox 4.4.
+Compatibilité : NetBox 4.7.

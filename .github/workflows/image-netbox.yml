@@ -6,7 +6,7 @@ on:
     inputs:
       version:
         description: "Version de l'image netboxcommunity/netbox"
-        default: "v4.4"
+        default: "v4.7"
 permissions:
   contents: read
 jobs:

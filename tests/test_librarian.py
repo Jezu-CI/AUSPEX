@@ -40,6 +40,8 @@ def site(tmp_path, monkeypatch, nb):
     monkeypatch.chdir(work)
     monkeypatch.setenv("NB_TOKEN", "secret")  # administrateur
     monkeypatch.setenv("LIBRARIAN_TOKEN", LIB_TOKEN)
+    # Jeton posé dans NetBox par « manage.py auspex_jeton » (install.sh), avant la mise en place
+    nb.data["/api/users/tokens/"].append({"id": 9999, "key": LIB_TOKEN})
     return work
 
 
@@ -67,8 +69,7 @@ def test_setup_creates_librarian_with_minimal_rights(site, nb, capsys):
         assert perm["users"] == [{"id": user["id"]}]
     add = next(x for x in p.values() if x["actions"] == ["add"])
     assert add["constraints"] == {"description": OBSERVED_DESCRIPTION}
-    token = nb.data["/api/users/tokens/"][0]
-    assert token["key"] == LIB_TOKEN and token["user"] == user["id"]
+    assert ("POST", "/api/users/tokens/") not in nb.requests   # NetBox 4.7 : jeton jamais créé par l'API
 
     assert main(["netbox", "setup", "--apply"]) == 0  # idempotent
     assert "Rien à faire" in capsys.readouterr().out
@@ -117,11 +118,11 @@ def test_admin_token_refused_as_librarian_token(site, nb, capsys, monkeypatch):
     assert nb.data["/api/users/users/"] == []
 
 
-def test_lost_librarian_token_is_recreated(site, nb, capsys):
+def test_lost_librarian_token_is_reported(site, nb, capsys):
     assert main(["netbox", "setup", "--apply"]) == 0
     nb.data["/api/users/tokens/"].clear()  # jeton révoqué dans NetBox
-    assert main(["netbox", "setup", "--apply"]) == 0
-    assert [t["key"] for t in nb.data["/api/users/tokens/"]] == [LIB_TOKEN]
+    assert main(["netbox", "setup", "--apply"]) == 4
+    assert "manage.py auspex_jeton Librarian --creer" in capsys.readouterr().err
 
 
 def test_setup_without_librarian_variable_still_works(site, nb, capsys, monkeypatch):
@@ -131,9 +132,9 @@ def test_setup_without_librarian_variable_still_works(site, nb, capsys, monkeypa
     assert nb.data["/api/users/users/"] == []
 
 
-def test_final_identity_check_catches_ignored_key(site, monkeypatch, capsys):
-    """Si NetBox ignore la clé fournie, le service ne doit pas démarrer avec un jeton inutilisable."""
-    fake = FakeNetBox(ignore_token_key=True)
+def test_final_identity_check_catches_missing_token(site, monkeypatch, capsys):
+    """Jeton de Librarian absent de NetBox : le service ne doit pas démarrer avec un jeton inutilisable."""
+    fake = FakeNetBox()
     try:
         cfg = yaml.safe_load((site / "auspex.yaml").read_text())
         cfg["netbox"]["url"] = fake.url

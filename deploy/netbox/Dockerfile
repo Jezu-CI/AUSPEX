@@ -11,7 +11,7 @@
 # quels, sans téléchargement, pour qu'une mise à jour fonctionne aussi sur un
 # site sans accès à Internet.
 ARG NETBOX_BASE=netbox-livree
-FROM netboxcommunity/netbox:v4.4@sha256:14c2de3f179d8ed5b5722a76b6d7389c8c95bb8be46c600f3d7fe1f7698b4574 AS netbox-livree
+FROM netboxcommunity/netbox:v4.7@sha256:a521748a89c8966565bbf7832fd01caef2a122f46a21ccf7a7b7682dd3428839 AS netbox-livree
 FROM ${NETBOX_BASE}
 
 COPY src/auspex /opt/auspex-lib/auspex
@@ -32,11 +32,6 @@ RUN rm -f /opt/netbox/netbox/netbox/ldap_config.py \
  && /opt/netbox/venv/bin/python -c 'import ldap, django_auth_ldap.config; print("LDAP disponible")' \
  && /opt/netbox/venv/bin/python -c 'import social_core.backends.open_id_connect, netbox_auspex.pipeline; print("OIDC disponible")'
 
-# SÉCURITÉ : le serveur web de l'image (NGINX Unit) remplace l'adresse source
-# par le contenu de X-Forwarded-For pour les sources qu'il juge de confiance.
-# Toute machine de ces plages pourrait alors usurper l'adresse d'un poste
-# autorisé. On supprime cette réécriture : le plugin voit l'adresse réelle et
-# n'accepte l'en-tête que depuis les proxys déclarés dans auspex.yaml.
 # Marque Auspex : logos, titre, charte « Scanner Auspex », mention « basé sur
 # NetBox Community » (licence Apache 2.0). Échoue si les gabarits ont changé.
 COPY deploy/netbox/branding /opt/auspex-lib/branding
@@ -45,8 +40,20 @@ RUN /opt/netbox/venv/bin/python /opt/auspex-lib/rebrand.py /opt/netbox/netbox /o
 # Fichiers statiques du plugin (carte) : collectstatic de l'image a déjà eu lieu.
 RUN cp -r /opt/auspex-lib/netbox_auspex/static/netbox_auspex /opt/netbox/netbox/static/
 
-COPY deploy/netbox/unit_no_forwarded.py /opt/auspex-lib/unit_no_forwarded.py
-RUN /opt/netbox/venv/bin/python /opt/auspex-lib/unit_no_forwarded.py /etc/unit/nginx-unit.json
+# SÉCURITÉ : le serveur web de l'image (Granian) remplace l'adresse source par
+# le contenu de X-Forwarded-For pour toute machine des plages privées : un
+# poste du réseau interne pourrait usurper l'adresse d'un poste autorisé. Son
+# point d'entrée est remplacé par un point d'entrée sans cette réécriture : le
+# plugin voit l'adresse réelle et n'accepte l'en-tête que des proxys déclarés
+# dans auspex.yaml. La construction échoue si l'image n'a plus la forme
+# attendue : mieux vaut une image en erreur qu'un contournement silencieux.
+COPY deploy/netbox/granian.py /opt/auspex-lib/granian.py
+RUN grep -q 'netbox.granian:application' /opt/netbox/launch-netbox.sh \
+ && grep -q 'wrap_wsgi_with_proxy_headers' /opt/netbox/netbox/netbox/granian.py \
+ && cp /opt/auspex-lib/granian.py /opt/netbox/netbox/netbox/granian.py \
+ && ! grep -qi 'proxy\|forwarded' /opt/netbox/launch-netbox.sh \
+ && ! grep -v '^#' /opt/netbox/netbox/netbox/granian.py | grep -qi 'proxy\|forwarded' \
+ && echo "Granian : réécriture par X-Forwarded-For supprimée"
 
 LABEL org.opencontainers.image.title="auspex-netbox" \
       org.opencontainers.image.description="Interface Auspex : NetBox Community avec le plugin et la marque Auspex"

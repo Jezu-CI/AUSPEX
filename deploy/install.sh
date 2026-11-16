@@ -38,17 +38,20 @@ if [ ! -f .env ]; then
     ( umask 077
     cat > .env <<EOF
 # Généré par install.sh le $(date -u +%Y-%m-%dT%H:%M:%SZ). Ne jamais versionner ce fichier.
-NETBOX_VERSION=v4.4
+NETBOX_VERSION=v4.7
 AUSPEX_VERSION=local
 DB_PASSWORD=$(rand 32)
 NETBOX_SECRET_KEY=$(rand 60)
 NETBOX_ADMIN_PASSWORD=$(rand 24)
-# Jeton administrateur NetBox : imposé à NetBox (sans lui, l'image crée un
-# jeton par défaut connu publiquement) et utilisé UNIQUEMENT pour la mise en
-# place. Il n'est jamais transmis au conteneur Auspex.
-NETBOX_ADMIN_TOKEN=$(rand_hex 40)
+# Poivre des jetons d'API : NetBox ne garde qu'une empreinte des jetons,
+# calculée avec ce secret. Le perdre ou le changer invalide les jetons.
+API_TOKEN_PEPPER=$(rand 64)
+# Jeton administrateur NetBox (v2 : nbt_CLÉ.SECRET), posé dans NetBox par cette
+# installation et utilisé UNIQUEMENT pour la mise en place. Il n'est jamais
+# transmis au conteneur Auspex.
+NETBOX_ADMIN_TOKEN=nbt_$(rand 12).$(rand 40)
 # Jeton du compte de service « Librarian » : le seul dont dispose Auspex.
-LIBRARIAN_TOKEN=$(rand_hex 40)
+LIBRARIAN_TOKEN=nbt_$(rand 12).$(rand 40)
 AUSPEX_UID=$AUSPEX_RUN_UID
 AUSPEX_GID=$AUSPEX_RUN_GID
 AUSPEX_INTERVAL=${AUSPEX_INTERVAL:-300}
@@ -62,8 +65,11 @@ fi
 if ! grep -q '^NETBOX_ADMIN_TOKEN=' .env && grep -q '^NETBOX_TOKEN=' .env; then
     sed -i 's/^NETBOX_TOKEN=/NETBOX_ADMIN_TOKEN=/' .env
 fi
-grep -q '^LIBRARIAN_TOKEN=' .env || echo "LIBRARIAN_TOKEN=$(rand_hex 40)" >> .env
+grep -q '^LIBRARIAN_TOKEN=' .env || echo "LIBRARIAN_TOKEN=nbt_$(rand 12).$(rand 40)" >> .env
 grep -q '^AUSPEX_PROXY_SECRET=' .env || echo "AUSPEX_PROXY_SECRET=$(rand_hex 64)" >> .env
+# Installation antérieure à NetBox 4.7 : poivre des jetons v2 (les jetons v1
+# déjà en place restent valables).
+grep -q '^API_TOKEN_PEPPER=' .env || echo "API_TOKEN_PEPPER=$(rand 64)" >> .env
 
 # Répertoires montés : créés ici (et non par Docker, qui les créerait au nom de root)
 mkdir -p tls config/tls data/state/tableau data/state/reception data/state/acces data/reception data/mises-a-jour logs backups
@@ -150,33 +156,26 @@ as_admin() {
         docker compose run --rm --no-deps -T -e NETBOX_TOKEN -e LIBRARIAN_TOKEN auspex "$@"
 }
 
-# Le jeton administrateur doit fonctionner. Sinon (NetBox déjà initialisé
-# avant cette installation, par exemple), un nouveau jeton est demandé.
+# Jetons de l'administrateur et de Librarian : leur valeur est dans .env, posée
+# dans NetBox par le plugin Auspex (NetBox 4.7 ne permet plus de la choisir
+# par l'API). La valeur passe par l'entrée standard, jamais en argument.
+pose_jeton() {
+    env_get "$2" | docker compose exec -T netbox /opt/netbox/venv/bin/python \
+        /opt/netbox/netbox/manage.py auspex_jeton "$1" "${@:3}"
+}
 admin_token_ok() {
     NETBOX_TOKEN="$(env_get NETBOX_ADMIN_TOKEN)" docker compose run --rm --no-deps -T \
         -e NETBOX_TOKEN --entrypoint python auspex -c '
 import os, urllib.request
+t = os.environ["NETBOX_TOKEN"]
 req = urllib.request.Request("http://netbox:8080/api/users/users/?limit=1",
-    headers={"Authorization": "Token " + os.environ["NETBOX_TOKEN"], "Accept": "application/json"})
+    headers={"Authorization": ("Bearer " if t.startswith("nbt_") else "Token ") + t, "Accept": "application/json"})
 urllib.request.urlopen(req, timeout=15)' >/dev/null 2>&1
 }
-if admin_token_ok; then
-    echo "Jeton administrateur NetBox opérationnel."
-else
-    say "Création d'un jeton administrateur NetBox"
-    token=$(NB_PASSWORD="$(env_get NETBOX_ADMIN_PASSWORD)" docker compose run --rm --no-deps -T \
-        --entrypoint python -e NB_PASSWORD auspex -c '
-import json, os, urllib.request
-req = urllib.request.Request("http://netbox:8080/api/users/tokens/provision/",
-    data=json.dumps({"username": "admin", "password": os.environ["NB_PASSWORD"],
-                     "description": "Auspex : mise en place"}).encode(),
-    headers={"Content-Type": "application/json", "Accept": "application/json"})
-d = json.load(urllib.request.urlopen(req, timeout=30))
-print(d.get("key") or d.get("token") or "")')
-    [ -n "$token" ] || fail "impossible d'obtenir un jeton NetBox."
-    sed -i "s/^NETBOX_ADMIN_TOKEN=.*/NETBOX_ADMIN_TOKEN=${token}/" .env
-    admin_token_ok || fail "le jeton NetBox obtenu ne fonctionne pas."
-fi
+pose_jeton admin NETBOX_ADMIN_TOKEN || fail "jeton administrateur NetBox impossible à poser."
+admin_token_ok || fail "le jeton administrateur NetBox ne fonctionne pas."
+echo "Jeton administrateur NetBox opérationnel."
+pose_jeton Librarian LIBRARIAN_TOKEN --creer || fail "jeton de Librarian impossible à poser."
 
 say "Mise en place dans NetBox : champs Auspex et compte de service Librarian"
 as_admin netbox setup --apply || fail "mise en place dans NetBox impossible."
