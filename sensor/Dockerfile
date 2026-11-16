@@ -25,6 +25,19 @@ RUN for p in modbus dnp3 bacnet opcua-binary omron-fins hart-ip ge-srtp profinet
         || echo "icsnpp-$p" >> /opt/icsnpp-absents; \
     done; touch /opt/icsnpp-absents
 
+# Outils de construction retirés une fois les parsers compilés : moins de code
+# embarqué, donc moins de surface et de vulnérabilités signalées. Chaque paquet
+# n'est retiré que si apt confirme, par simulation, qu'il n'emporte aucun
+# paquet Zeek avec lui (le paquet Zeek dépend de certains : ils restent).
+RUN for p in build-essential cmake libpcap-dev git python3-git; do \
+      if ! dpkg -s "$p" >/dev/null 2>&1; then continue; fi; \
+      if apt-get -s purge --auto-remove "$p" 2>&1 | grep -q '^Remv zeek'; then \
+        echo "$p conservé (requis par Zeek)"; \
+      else apt-get purge -y --auto-remove "$p" >/dev/null && echo "$p retiré"; fi; \
+    done \
+ && rm -rf /var/lib/apt/lists/* /root/.cache \
+ && zeek --version
+
 # JA4+ (FoxIO) n'est PAS embarqué : hors JA4 lui-même (BSD), les méthodes JA4+
 # relèvent de la FoxIO License 1.1, qui interdit l'usage monétisé sans licence OEM.
 # Aucune règle d'Auspex ne s'en servait ; à réévaluer avec une licence compatible.
