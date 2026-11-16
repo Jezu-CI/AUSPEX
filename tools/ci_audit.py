@@ -49,13 +49,13 @@ def run(*cmd, cwd=None) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
 
 
-def download(b: SSOBrowser, url: str) -> tuple[int, bytes, dict]:
+def download(b: SSOBrowser, url: str) -> tuple:
     req = urllib.request.Request(url, headers={"X-Forwarded-For": CLIENT})
     try:
         with b.opener.open(req, timeout=30) as r:
-            return r.status, r.read(), dict(r.headers)
+            return r.status, r.read(), r.headers   # insensible à la casse (Granian : en-têtes en minuscules)
     except urllib.error.HTTPError as e:
-        return e.code, e.read(), dict(e.headers)
+        return e.code, e.read(), e.headers
 
 
 def main() -> int:
