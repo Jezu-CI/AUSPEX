@@ -126,13 +126,9 @@ class MFARequiredMiddleware:
         return any(path.startswith(p) for p in prefixes)
 
     def __call__(self, request):
-        # SAML : le bouton de NetBox mène à /oauth/login/saml/ sans le nom du
-        # fournisseur, que social-auth exige (?idp=...). On le complète.
-        if request.path.rstrip("/").endswith("/oauth/login/saml") and "idp" not in request.GET:
-            from auspex.netbox_auth import SAML_IDP_NAME
-            query = request.GET.copy()
-            query["idp"] = SAML_IDP_NAME
-            return HttpResponseRedirect(f"{request.path}?{query.urlencode()}")
+        # SAML : NetBox 4.7 joint lui-même le nom du fournisseur (idp) au
+        # formulaire de connexion (la connexion unique ne commence plus que par
+        # un POST) : plus rien à compléter ici.
         user = getattr(request, "user", None)
         if (user is not None and user.is_authenticated
                 and request.session.get(BACKEND_SESSION_KEY) in LOCAL_BACKENDS

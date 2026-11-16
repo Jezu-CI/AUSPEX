@@ -167,8 +167,21 @@ class SSOBrowser:
         except urllib.error.HTTPError as e:
             return e.code, e.geturl(), e.read().decode("utf-8", "replace")
 
+    def sso_begin(self, backend: str):
+        """Bouton « connexion unique » de la page de connexion NetBox : depuis
+        NetBox 4.7, la connexion ne commence que par un POST (jeton CSRF et
+        paramètres du formulaire, dont idp pour SAML)."""
+        status, url, page = self.open(f"{URL}/login/?next={PAGE}")
+        for form in re.findall(r"<form[^>]*>.*?</form>", page, re.S):
+            action = re.search(r'action="([^"]+)"', form)
+            if action and f"/oauth/login/{backend}/" in html.unescape(action.group(1)):
+                fields = {html.unescape(n): html.unescape(v) for n, v in
+                          re.findall(r'<input[^>]*name="([^"]+)"[^>]*value="([^"]*)"', form)}
+                return self.open(urllib.parse.urljoin(URL + "/", html.unescape(action.group(1))), fields)
+        return status, url, page
+
     def sso_login(self, user, password):
-        status, url, page = self.open(f"{URL}/oauth/login/oidc/?next={PAGE}")
+        status, url, page = self.sso_begin("oidc")
         if not url.startswith(KC):
             return status, url, page
         form = re.search(r'<form[^>]*id="kc-form-login"[^>]*>', page) or re.search(r"<form[^>]*>", page)

@@ -48,7 +48,7 @@ def form_fields(page: str) -> tuple[str | None, dict]:
 def saml_login(user: str, password: str, tamper=None, expect_ok: bool = True, b=None):
     """Connexion SAML complète. `tamper` : modifie l'assertion avant de la poster."""
     b = b or SSOBrowser()
-    status, url, page = b.open(f"{URL}/oauth/login/saml/?next={PAGE}")
+    status, url, page = b.sso_begin("saml")
     if not url.startswith(KC):
         diagnose("pas de redirection vers le fournisseur", status, url, page)
         return status, url, page
