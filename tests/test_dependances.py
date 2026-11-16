@@ -79,8 +79,8 @@ def test_images_livrees():
     for nom in ("netboxcommunity/netbox:", "python:", "zeek/zeek:", "nginxinc/nginx-unprivileged:"):
         assert any(i.startswith(nom) and "@sha256:" in i for i in liste), nom
     # Images tierces du docker-compose (données, cache).
-    assert any(i.startswith("postgres:") for i in liste)
-    assert any(i.startswith("valkey/valkey:") for i in liste)
+    assert any(i.startswith("postgres:") and "@sha256:" in i for i in liste)
+    assert any(i.startswith("valkey/valkey:") and "@sha256:" in i for i in liste)
 
 
 def test_trivy_installe_a_version_figee():

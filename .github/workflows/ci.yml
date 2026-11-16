@@ -192,7 +192,7 @@ jobs:
     if: needs.changes.outputs.netbox == 'true'
     services:
       postgres:
-        image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+        image: postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e   # même image que deploy/docker-compose.yml
         env:
           POSTGRES_USER: netbox
           POSTGRES_PASSWORD: netbox

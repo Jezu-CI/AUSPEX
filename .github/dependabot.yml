@@ -17,6 +17,13 @@ updates:
       images: { patterns: ["*"] }
     commit-message: { prefix: "Dépendances (images)" }
 
+  - package-ecosystem: docker-compose   # images tierces du central (PostgreSQL, Valkey)
+    directory: /deploy
+    schedule: { interval: weekly, day: monday }
+    groups:
+      images-compose: { patterns: ["*"] }
+    commit-message: { prefix: "Dépendances (images)" }
+
   - package-ecosystem: pip
     directories: [/, /requirements]   # pyproject.toml et dépendances figées (tools/figer-dependances.sh)
     # Seules les versions exactes des fichiers figés (requirements/*.txt) évoluent :

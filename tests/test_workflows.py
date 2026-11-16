@@ -109,6 +109,22 @@ def test_dependabot_covers_pinned_ecosystems():
     assert {"github-actions", "docker", "pip"} <= set(eco)
     dirs = set(eco["docker"]["directories"])
     assert {"/" + str(df.parent.relative_to(ROOT)) for df in DOCKERFILES} <= dirs
+    assert eco["docker-compose"]["directory"] == "/deploy"
+
+
+def test_compose_images_pinned():
+    """Images tierces du central (PostgreSQL, Valkey) figées par empreinte, comme les
+    images de base ; celles construites par Auspex (auspex-*) le sont par leur Dockerfile."""
+    compose = yaml.safe_load((ROOT / "deploy" / "docker-compose.yml").read_text(encoding="utf-8"))
+    tierces = [s["image"] for s in compose["services"].values() if "build" not in s]
+    assert len(tierces) == 2
+    for image in tierces:
+        assert re.search(r"@sha256:[0-9a-f]{64}$", image), image
+    # La CI teste NetBox réel avec la même base de données que celle livrée
+    ci = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    services = [s["image"] for j in ci["jobs"].values() for s in (j.get("services") or {}).values()]
+    pg = next(i for i in tierces if i.startswith("postgres:"))
+    assert all(i == pg for i in services if i.startswith("postgres:"))
 
 
 def test_scorecard_workflow_publishable():
